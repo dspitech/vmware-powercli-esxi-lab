@@ -2,6 +2,24 @@
 
 Guide de référence et support de cours pour l'administration d'un hôte VMware ESXi avec VMware PowerCLI, réalisé sur la plateforme VMware Hands-on Labs (HOL).
 
+## Informations sur le laboratoire
+
+| Information | Détail |
+|---|---|
+| **Titre** | Laboratoire PowerCLI sur hôte ESXi |
+| **Auteur** | LO Pape |
+| **Date de publication** | 17 novembre 2026 |
+| **Dernière mise à jour** | 17 novembre 2026 |
+| **Version** | 1.0.0 |
+| **Statut** | Première publication |
+| **Type de document** | Laboratoire technique |
+| **Technologie principale** | VMware PowerCLI |
+| **Environnement** | VMware ESXi |
+| **Langue** | Français |
+| **Licence** | MIT |
+
+<img width="750" height="420" alt="image" src="https://github.com/user-attachments/assets/1e29125f-19b5-4e9f-8273-83df6cf00793" />
+
 ---
 
 ## Table des matières
@@ -237,7 +255,7 @@ Installation : `Install-Module VMware.PowerCLI -Scope CurrentUser`. Sous Linux, 
 
 À la fin de cette phase, l'étudiant sait établir une session PowerCLI sécurisée vers un hôte, expliquer pourquoi le certificat est refusé par défaut, maîtriser la notion de mode maintenance, comprendre le rôle du rescan de stockage et produire un inventaire structuré de l'hôte.
 
-### Cours : le modèle de session
+### le modèle de session
 
 Une connexion `Connect-VIServer` ouvre une session authentifiée entre la machine d'administration et l'API de l'hôte. Tant que la session est ouverte, chaque cmdlet l'utilise implicitement. PowerCLI mémorise les connexions dans la variable globale `$global:DefaultVIServers`.
 
@@ -262,13 +280,13 @@ La portée du réglage se choisit avec `-Scope` : `Session` (fenêtre en cours),
 
 Sur un hôte autonome, l'authentification repose sur des comptes locaux. Le compte `root` possède tous les droits. L'objet `PSCredential` transporte le couple identifiant et mot de passe sans le réafficher. La construction avec `ConvertTo-SecureString -AsPlainText -Force` écrit le mot de passe en clair dans le script : c'est toléré en lab, à proscrire en production, où l'on privilégie `Get-Credential` ou un coffre de secrets.
 
-### Cours : le mode maintenance
+### Le mode maintenance
 
 Le mode maintenance place l'hôte dans un état où il n'accepte plus de démarrage de VM. Sur un cluster vCenter, les VM sont évacuées automatiquement par vMotion. Sur un hôte autonome, il n'y a personne vers qui évacuer : les VM allumées doivent être éteintes ou suspendues avant d'entrer en maintenance.
 
 L'état de connexion d'un hôte (`ConnectionState`) peut valoir `Connected`, `Maintenance`, `Disconnected` ou `NotResponding`. Un hôte qui sort d'un déploiement peut être resté en maintenance, d'où la commande `Set-VMHost -State Connected` du lab.
 
-### Cours : le rescan du stockage
+### Le rescan du stockage
 
 Un rescan demande à l'hôte de redétecter ce qui est connecté à ses adaptateurs de stockage.
 
@@ -279,7 +297,7 @@ Un rescan demande à l'hôte de redétecter ce qui est connecté à ses adaptate
 
 Après la création d'un LUN sur la baie ou après le démarrage d'un lab, l'hôte ne le voit pas tant qu'un rescan n'a pas été fait. La séquence HBA puis VMFS est donc la règle.
 
-### Cours : lire un inventaire
+### Lire un inventaire
 
 Un inventaire initial est la photographie de départ de l'infrastructure. Il sert de référence pour mesurer les changements. Les cmdlets `Get-*` ne modifient rien et peuvent être lancées sans risque. Pour découvrir toutes les propriétés d'un objet : `Get-VMHost | Format-List *`.
 
@@ -303,56 +321,93 @@ Indicateurs à relever dès le départ : version et build d'ESXi (support et cor
 4. Où est mémorisée la liste des sessions PowerCLI ouvertes ?
    Réponse : dans `$global:DefaultVIServers`.
 
-### Commandes
+## Se connecter à la VM ESXI
+
+<img width="1562" height="621" alt="image" src="https://github.com/user-attachments/assets/4888d73a-6d81-461d-9a6a-df4cb697559e" />
+<img width="1537" height="551" alt="image" src="https://github.com/user-attachments/assets/8885d16d-5890-4518-b1d1-175ea79f73c3" />
+<img width="1562" height="795" alt="image" src="https://github.com/user-attachments/assets/cc7507a2-83db-4907-9ad1-b12360b6852e" />
+<img width="1456" height="755" alt="image" src="https://github.com/user-attachments/assets/ea029a1a-4362-4417-b1d1-29d739cad410" />
+<img width="1350" height="757" alt="image" src="https://github.com/user-attachments/assets/dddf6927-1556-4435-bd4b-13af415cd0f5" />
+<img width="987" height="737" alt="image" src="https://github.com/user-attachments/assets/9b183176-9799-4c27-af5a-5e8ef2673351" />
+<img width="992" height="282" alt="image" src="https://github.com/user-attachments/assets/756796c3-0f55-4689-a807-aa327df8ee20" />
+
+
+Configure PowerCLI pour accepter les certificats auto-signés. Le paramètre `-Scope User` applique le réglage à l'utilisateur courant de façon persistante. `-Confirm:$false` supprime la demande de confirmation.
 
 ```powershell
 Set-PowerCLIConfiguration -InvalidCertificateAction Ignore -Scope User -Confirm:$false
 ```
+<img width="1226" height="262" alt="image" src="https://github.com/user-attachments/assets/2edb9393-ca01-4bce-92b6-499c2bf31177" />
 
-Configure PowerCLI pour accepter les certificats auto-signés. Le paramètre `-Scope User` applique le réglage à l'utilisateur courant de façon persistante. `-Confirm:$false` supprime la demande de confirmation.
+
+Crée un objet d'identifiants. `ConvertTo-SecureString` transforme le mot de passe en chaîne sécurisée. L'option `-AsPlainText -Force` est nécessaire car la source est un texte en clair.
 
 ```powershell
 $esxiCred = New-Object System.Management.Automation.PSCredential ("root", (ConvertTo-SecureString "VMware123!" -AsPlainText -Force))
 ```
 
-Crée un objet d'identifiants. `ConvertTo-SecureString` transforme le mot de passe en chaîne sécurisée. L'option `-AsPlainText -Force` est nécessaire car la source est un texte en clair.
+<img width="1157" height="161" alt="image" src="https://github.com/user-attachments/assets/383cf70e-45d6-42de-b2e9-a42690734926" />
+
+
+Ouvre la session entre PowerCLI et l'hôte. Toutes les cmdlets suivantes s'exécutent sur cette connexion. Si le DNS échoue, remplacer le nom par `10.0.0.22`.
 
 ```powershell
 Connect-VIServer -Server "esx-03a.vcf.sddc.lab" -Credential $esxiCred
 ```
 
-Ouvre la session entre PowerCLI et l'hôte. Toutes les cmdlets suivantes s'exécutent sur cette connexion. Si le DNS échoue, remplacer le nom par `10.0.0.22`.
+<img width="866" height="217" alt="image" src="https://github.com/user-attachments/assets/ac1b9290-2e35-4d5d-bb1c-7b967065d1f4" />
+
+
+Fait sortir l'hôte du mode maintenance. Sans cette étape, le démarrage des VM est refusé.
+<img width="1335" height="651" alt="image" src="https://github.com/user-attachments/assets/3e911ee9-22c3-4991-b6c3-04e409461d16" />
 
 ```powershell
 Set-VMHost -VMHost (Get-VMHost) -State Connected -Confirm:$false
 ```
 
-Fait sortir l'hôte du mode maintenance. Sans cette étape, le démarrage des VM est refusé.
+<img width="1057" height="201" alt="image" src="https://github.com/user-attachments/assets/afe9f414-3571-4a16-80fb-4de2207697ab" />
+<img width="1332" height="652" alt="image" src="https://github.com/user-attachments/assets/b06db5ac-15df-4ab5-9924-507acbd50be6" />
+
+
+Relance la détection sur tous les adaptateurs de stockage (`-RescanAllHba`) puis recherche les volumes VMFS (`-RescanVmfs`). Indispensable dans HOL où le stockage iSCSI peut apparaître après le démarrage.
 
 ```powershell
 Get-VMHostStorage -VMHost (Get-VMHost) -RescanAllHba -RescanVmfs
 ```
 
-Relance la détection sur tous les adaptateurs de stockage (`-RescanAllHba`) puis recherche les volumes VMFS (`-RescanVmfs`). Indispensable dans HOL où le stockage iSCSI peut apparaître après le démarrage.
+<img width="902" height="172" alt="image" src="https://github.com/user-attachments/assets/0a43ce34-51a3-4d5a-aa27-cecc8d8ca1d2" />
+
+
+Stocke l'objet hôte dans une variable réutilisable, puis affiche son nom, sa version, son numéro de build, son nombre de CPU, sa mémoire et son état de connexion.
 
 ```powershell
 $vmhost = Get-VMHost
 $vmhost | Select-Object Name, Version, Build, NumCpu, MemoryTotalGB, ConnectionState
 ```
 
-Stocke l'objet hôte dans une variable réutilisable, puis affiche son nom, sa version, son numéro de build, son nombre de CPU, sa mémoire et son état de connexion.
+<img width="795" height="212" alt="image" src="https://github.com/user-attachments/assets/9aac7937-3d25-410f-9c1c-89a475eabca8" />
+
+
+Liste les datastores avec leur type (VMFS, NFS), leur capacité et leur espace libre.
 
 ```powershell
 Get-Datastore | Select-Object Name, Type, CapacityGB, FreeSpaceGB
 ```
 
-Liste les datastores avec leur type (VMFS, NFS), leur capacité et leur espace libre.
+<img width="887" height="295" alt="image" src="https://github.com/user-attachments/assets/86eeb57d-73fa-4130-95e8-f08f69d46e8f" />
+<img width="1342" height="610" alt="image" src="https://github.com/user-attachments/assets/e984eadb-495a-45cc-bbcd-b873ae1210df" />
+
+
+Liste les commutateurs virtuels standard, les cartes physiques associées et la taille de MTU.
 
 ```powershell
 Get-VirtualSwitch -VMHost $vmhost | Select-Object Name, Nic, Mtu
 ```
 
-Liste les commutateurs virtuels standard, les cartes physiques associées et la taille de MTU.
+<img width="877" height="216" alt="image" src="https://github.com/user-attachments/assets/143230eb-36da-48a2-8f68-898117f6fad7" />
+<img width="1317" height="612" alt="image" src="https://github.com/user-attachments/assets/0d90bc9f-c35c-40ec-ac0d-4a4b38308b14" />
+
+
 
 ---
 
@@ -362,7 +417,7 @@ Liste les commutateurs virtuels standard, les cartes physiques associées et la 
 
 À la fin de cette phase, l'étudiant sait décrire la chaîne réseau complète d'un hôte ESXi, créer un vSwitch avec uplinks, définir des port groups avec VLAN, expliquer les trois modes de marquage VLAN, configurer une interface VMkernel et appliquer une politique de sécurité adaptée.
 
-### Cours : la chaîne réseau d'un hôte
+### La chaîne réseau d'un hôte
 
 ```text
  VM (vNIC)  ---+
@@ -378,7 +433,7 @@ Liste les commutateurs virtuels standard, les cartes physiques associées et la 
 
 Un vSwitch sans uplink est un réseau interne à l'hôte : les VM connectées peuvent communiquer entre elles sur cet hôte, mais pas vers l'extérieur.
 
-### Cours : vSwitch standard et vSwitch distribué
+### vSwitch standard et vSwitch distribué
 
 | Critère | Standard (VSS) | Distribué (VDS) |
 | :--- | :--- | :--- |
@@ -389,7 +444,7 @@ Un vSwitch sans uplink est un réseau interne à l'hôte : les VM connectées pe
 
 Dans le lab, seul le vSwitch standard est possible.
 
-### Cours : les VLAN et le marquage 802.1Q
+### Les VLAN et le marquage 802.1Q
 
 Un VLAN segmente un réseau physique en domaines de diffusion isolés. La trame porte une étiquette de 12 bits (valeurs 1 à 4094). Trois modes existent :
 
@@ -401,7 +456,7 @@ Un VLAN segmente un réseau physique en domaines de diffusion isolés. La trame 
 
 Le lab utilise VST : `VLAN10-Serveurs` porte le VLAN 10 et `VLAN20-Clients` le VLAN 20. Le port du commutateur physique doit être un trunk qui autorise ces VLAN, sinon le trafic n'a pas d'issue. Une erreur très courante est de configurer le VLAN dans ESXi sans autoriser ce VLAN sur le trunk.
 
-### Cours : les trois paramètres de sécurité
+### Les trois paramètres de sécurité
 
 | Paramètre | Comportement si autorisé | Risque |
 | :--- | :--- | :--- |
@@ -411,11 +466,11 @@ Le lab utilise VST : `VLAN10-Serveurs` porte le VLAN 10 et `VLAN20-Clients` le V
 
 Le promiscuous mode est refusé par défaut. Pour MAC address changes et Forged transmits, la valeur par défaut dépend de la version et de la configuration (elle peut être Accept), d'où l'intérêt de les imposer explicitement à Reject, comme le fait le lab. Autoriser ces options est rarement nécessaire (analyseurs réseau, certains équilibreurs de charge ou clusters logiciels). La politique du port group remplace celle du vSwitch.
 
-### Cours : les interfaces VMkernel et leurs services
+### Les interfaces VMkernel et leurs services
 
 Une interface VMkernel peut porter un ou plusieurs services : gestion, vMotion, provisioning (migrations à froid et clones), Fault Tolerance, vSAN, réplication, trafic NFS et iSCSI. Chaque service doit être isolé autant que possible dans son VLAN et son sous-réseau. Une pile TCP/IP dédiée (par défaut, vMotion, provisioning) permet d'avoir des passerelles distinctes.
 
-### Cours : MTU et formation de la bande passante
+### MTU et formation de la bande passante
 
 - La MTU par défaut est de 1500 octets. Les trames jumbo (9000) réduisent la charge CPU pour le stockage IP, mais exigent la même MTU sur toute la chaîne.
 - Sur un vSwitch standard, la limitation de bande passante ne s'applique qu'au trafic sortant de l'hôte (traffic shaping : débit moyen, crête, taille de rafale).
@@ -446,7 +501,9 @@ Une interface VMkernel peut porter un ou plusieurs services : gestion, vMotion, 
 4. Que se passe-t-il si le port physique n'est pas un trunk et que le port group est en VLAN 10 ?
    Réponse : les trames étiquetées ne passent pas, la VM n'a pas de connectivité externe.
 
-### Commandes
+### Création d'un `vSwitch1`
+
+Cherche `vSwitch1`. S'il n'existe pas, le crée avec `vmnic1` comme premier uplink et une MTU de 1500, puis recharge l'objet. Ce schéma conditionnel rend le script rejouable sans erreur (idempotence).
 
 ```powershell
 $vs = Get-VirtualSwitch -VMHost $vmhost -Name 'vSwitch1' -ErrorAction SilentlyContinue
@@ -456,40 +513,59 @@ if (-not $vs) {
 }
 ```
 
-Cherche `vSwitch1`. S'il n'existe pas, le crée avec `vmnic1` comme premier uplink et une MTU de 1500, puis recharge l'objet. Ce schéma conditionnel rend le script rejouable sans erreur (idempotence).
+<img width="932" height="232" alt="image" src="https://github.com/user-attachments/assets/af99c4ad-8c7c-4094-bbf3-cccf66ff167e" />
+<img width="1317" height="606" alt="image" src="https://github.com/user-attachments/assets/88837836-bf68-480b-802a-531623c235fa" />
+
+
+Ajoute `vmnic3` comme second uplink de `vSwitch1`. Le vSwitch dispose alors de deux cartes, ce qui constitue un teaming et une tolérance de panne.
 
 ```powershell
 Add-VirtualSwitchPhysicalNetworkAdapter -VirtualSwitch $vs -VMHostPhysicalNic (Get-VMHostNetworkAdapter -VMHost $vmhost -Physical -Name 'vmnic3') -Confirm:$false
 ```
 
-Ajoute `vmnic3` comme second uplink de `vSwitch1`. Le vSwitch dispose alors de deux cartes, ce qui constitue un teaming et une tolérance de panne.
+<img width="1222" height="97" alt="image" src="https://github.com/user-attachments/assets/4184041c-5b72-4b60-b3bc-2b7a25334696" />
+<img width="1317" height="612" alt="image" src="https://github.com/user-attachments/assets/aca218ad-aee1-4810-a9e6-ec660dc5afa1" />
+
+
+Crée deux port groups, l'un étiqueté VLAN 10 pour les serveurs, l'autre VLAN 20 pour les clients. Le trafic des VM connectées est isolé par VLAN.
 
 ```powershell
 New-VirtualPortGroup -VirtualSwitch $vs -Name 'VLAN10-Serveurs' -VLanId 10
 New-VirtualPortGroup -VirtualSwitch $vs -Name 'VLAN20-Clients' -VLanId 20
 ```
 
-Crée deux port groups, l'un étiqueté VLAN 10 pour les serveurs, l'autre VLAN 20 pour les clients. Le trafic des VM connectées est isolé par VLAN.
+<img width="902" height="240" alt="image" src="https://github.com/user-attachments/assets/7c126d21-15f1-4bca-9346-90c85c1d6a06" />
+<img width="1307" height="612" alt="image" src="https://github.com/user-attachments/assets/b77e73d4-cfe2-41a5-adfc-6b37614c238e" />
+
+Récupère la politique de sécurité du port group puis désactive les trois comportements sensibles. C'est une mesure de durcissement qui limite l'écoute du trafic et l'usurpation d'adresse MAC.
 
 ```powershell
 $pg10 = Get-VirtualPortGroup -VMHost $vmhost -Name 'VLAN10-Serveurs'
 Get-SecurityPolicy -VirtualPortGroup $pg10 | Set-SecurityPolicy -AllowPromiscuous $false -ForgedTransmits $false -MacChanges $false -Confirm:$false
 ```
 
-Récupère la politique de sécurité du port group puis désactive les trois comportements sensibles. C'est une mesure de durcissement qui limite l'écoute du trafic et l'usurpation d'adresse MAC.
+<img width="1402" height="377" alt="image" src="https://github.com/user-attachments/assets/27d58ece-016f-49c5-bc60-17fc1b4a0d32" />
+<img width="1426" height="561" alt="image" src="https://github.com/user-attachments/assets/f623cd13-cdcd-4bc5-aad0-27f524d48de6" />
+
+
+Crée une interface VMkernel connectée au port group VLAN 10 avec l'adresse `10.0.10.6/24`. L'hôte devient joignable dans ce réseau.
 
 ```powershell
 New-VMHostNetworkAdapter -VMHost $vmhost -VirtualSwitch $vs -PortGroup 'VLAN10-Serveurs' -IP '10.0.10.6' -SubnetMask '255.255.255.0' -Confirm:$false
 ```
+<img width="1405" height="387" alt="image" src="https://github.com/user-attachments/assets/89c07a9b-8a5d-4d7b-a13f-3a291cdd247d" />
+<img width="1410" height="512" alt="image" src="https://github.com/user-attachments/assets/4024eb1f-0832-4121-a24d-4da1bdc19849" />
 
-Crée une interface VMkernel connectée au port group VLAN 10 avec l'adresse `10.0.10.6/24`. L'hôte devient joignable dans ce réseau.
+
+Exporte l'état du réseau en fichiers CSV. **Point d'attention** : le terminal est sous Linux, il faut des chemins de type `/home/holuser/` et non `C:\`. `-NoTypeInformation` retire la ligne d'en-tête de type PowerShell.
 
 ```powershell
 Get-VirtualSwitch -VMHost $vmhost | Select-Object Name, Nic, Mtu | Export-Csv -Path "/home/holuser/Rapport-vSwitch.csv" -NoTypeInformation
 Get-VirtualPortGroup -VMHost $vmhost | Select-Object Name, VirtualSwitchName, VLanId | Export-Csv -Path "/home/holuser/Rapport-PortGroups.csv" -NoTypeInformation
 ```
 
-Exporte l'état du réseau en fichiers CSV. **Point d'attention** : le terminal est sous Linux, il faut des chemins de type `/home/holuser/` et non `C:\`. `-NoTypeInformation` retire la ligne d'en-tête de type PowerShell.
+<img width="1418" height="512" alt="image" src="https://github.com/user-attachments/assets/441e3056-3cee-4655-b867-ab32133083a3" />
+
 
 ---
 
@@ -513,7 +589,7 @@ Exporte l'état du réseau en fichiers CSV. **Point d'attention** : le terminal 
 
 On distingue le **stockage bloc** (l'hôte voit un disque brut et y pose VMFS : FC, iSCSI, local) du **stockage fichier** (l'hôte monte un partage : NFS).
 
-### Cours : l'architecture iSCSI
+### L'architecture iSCSI
 
 ```text
  Hôte ESXi (initiateur)                         Baie FreeNAS (cible)
@@ -529,11 +605,11 @@ On distingue le **stockage bloc** (l'hôte voit un disque brut et y pose VMFS : 
 - **Masquage de LUN** : la baie décide quels initiateurs voient quels LUN, grâce à des listes d'accès. Il évite qu'un hôte voie des LUN qui ne lui sont pas destinés.
 - Le réseau iSCSI doit être dédié ou isolé (VLAN), idéalement avec des trames jumbo cohérentes de bout en bout.
 
-### Cours : les périphériques et leurs identifiants
+### Les périphériques et leurs identifiants
 
 Chaque LUN reçoit un identifiant stable. Le **nom canonique** commence généralement par `naa.` (Network Address Authority), parfois `t10.` ou `eui.`. Il est indépendant du chemin et ne change pas au redémarrage, contrairement aux noms de type `vmhba64:C0:T0:L1` qui désignent un chemin. En automatisation, il faut toujours cibler un LUN par son nom canonique et non par un nom de chemin.
 
-### Cours : le système de fichiers VMFS
+### Le système de fichiers VMFS
 
 VMFS est un système de fichiers cluster : plusieurs hôtes peuvent y lire et écrire simultanément, grâce à un verrouillage fin par fichier (ATS, Atomic Test and Set) qui a remplacé les anciennes réservations SCSI sur le volume entier.
 
@@ -548,13 +624,13 @@ VMFS est un système de fichiers cluster : plusieurs hôtes peuvent y lire et é
 
 Pour un nouveau datastore, on choisit VMFS 6, qui est la version actuelle. Le disque est partitionné en GPT.
 
-### Cours : provisionnement et occupation
+### Provisionnement et occupation
 
 - Le provisionnement dynamique (thin) permet de promettre plus d'espace que n'en contient physiquement le datastore (sur-allocation). Il faut alors surveiller l'espace libre, car un datastore plein suspend les VM qui ont besoin d'écrire.
 - Règle d'exploitation répandue : conserver au moins 20 pour cent d'espace libre, pour absorber les snapshots, les fichiers de swap et la croissance des disques thin.
 - Le suivi se fait avec un rapport régulier, comme celui exporté en CSV dans le lab.
 
-### Cours : choisir le bon LUN avant de formater
+### Choisir le bon LUN avant de formater
 
 Créer un datastore **détruit** les données présentes sur le LUN. Le lab filtre sur la capacité (45 Go) car il ne contient que deux LUN de taille différente. En production, il faut vérifier le nom canonique, le fabricant, le modèle et s'assurer que le LUN n'est pas déjà utilisé (`Get-Datastore` et `Get-ScsiLun` croisés).
 
@@ -583,32 +659,47 @@ Créer un datastore **détruit** les données présentes sur le LUN. Le lab filt
 4. Que se passe-t-il pour les données d'un LUN sur lequel on crée un datastore ?
    Réponse : elles sont effacées, le LUN est reformaté en VMFS.
 
-### Commandes
+Liste les LUN de type disque vus par l'hôte avec leur identifiant, leur capacité, leur fabricant et leur modèle. Sert à repérer le LUN libre.
 
 ```powershell
 Get-ScsiLun -VMHost $vmhost -LunType disk | Select-Object CanonicalName, CapacityGB, Vendor, Model
 ```
 
-Liste les LUN de type disque vus par l'hôte avec leur identifiant, leur capacité, leur fabricant et leur modèle. Sert à repérer le LUN libre.
+<img width="1390" height="422" alt="image" src="https://github.com/user-attachments/assets/a9de37e5-9db1-444c-8bcf-7ee6a8290406" />
+<img width="1431" height="572" alt="image" src="https://github.com/user-attachments/assets/5b515161-4421-453f-b773-19a5ce2e408a" />
+
+
+Affiche les adaptateurs de stockage, leur type (iSCSI, bloc), leur état et l'IQN de l'initiateur.
 
 ```powershell
 Get-VMHostHba -VMHost $vmhost | Select-Object Device, Type, Status, IScsiName
 ```
 
-Affiche les adaptateurs de stockage, leur type (iSCSI, bloc), leur état et l'IQN de l'initiateur.
+<img width="1407" height="367" alt="image" src="https://github.com/user-attachments/assets/43b46d9c-eb67-4466-8498-9cbe9d1fb0af" />
+<img width="1417" height="582" alt="image" src="https://github.com/user-attachments/assets/02dffb44-321e-49bc-8653-c5b373322573" />
+
+
+Sélectionne le LUN de 45 Go grâce à sa capacité, puis crée un datastore VMFS 6 nommé `ds-iscsi02` dessus. Le filtre par taille est pratique en lab mais, en production, il vaut mieux filtrer par identifiant pour éviter de formater un mauvais LUN.
 
 ```powershell
 $lunLibre = Get-ScsiLun -VMHost $vmhost -LunType disk | Where-Object { $_.CapacityGB -eq 45 }
 New-Datastore -VMHost $vmhost -Name 'ds-iscsi02' -Path $lunLibre.CanonicalName -Vmfs -FileSystemVersion "6"
 ```
+<img width="1407" height="372" alt="image" src="https://github.com/user-attachments/assets/ad20eb23-fc69-450e-b99c-87f9f9443f35" />
+<img width="1396" height="572" alt="image" src="https://github.com/user-attachments/assets/6785b8cd-6595-4292-bd43-ad75b9824143" />
 
-Sélectionne le LUN de 45 Go grâce à sa capacité, puis crée un datastore VMFS 6 nommé `ds-iscsi02` dessus. Le filtre par taille est pratique en lab mais, en production, il vaut mieux filtrer par identifiant pour éviter de formater un mauvais LUN.
+
+Produit un rapport de stockage. La propriété calculée `%Utilisé` applique la formule (capacité moins espace libre) divisé par capacité, multiplié par 100, arrondi à deux décimales.
 
 ```powershell
 Get-Datastore | Select-Object Name, Type, CapacityGB, FreeSpaceGB, @{N='%Utilisé';E={[math]::Round((($_.CapacityGB - $_.FreeSpaceGB) / $_.CapacityGB) * 100, 2)}} | Export-Csv -Path "/home/holuser/Rapport-Stockage.csv" -NoTypeInformation
 ```
 
-Produit un rapport de stockage. La propriété calculée `%Utilisé` applique la formule (capacité moins espace libre) divisé par capacité, multiplié par 100, arrondi à deux décimales.
+<img width="1414" height="451" alt="image" src="https://github.com/user-attachments/assets/c7c47458-66aa-41b3-9c40-dafef98b1114" />
+<img width="1412" height="502" alt="image" src="https://github.com/user-attachments/assets/c9b056e3-c20e-4deb-b0e1-6ed379a935f5" />
+
+
+
 
 ---
 
@@ -635,7 +726,7 @@ Une VM est un dossier sur un datastore contenant plusieurs fichiers :
 
 La taille du fichier `.vswp` est égale à la mémoire configurée moins la réservation mémoire. Une VM de 4 Go sans réservation consomme donc 4 Go de datastore dès qu'elle démarre : il faut en tenir compte dans le dimensionnement.
 
-### Cours : le matériel virtuel
+### Le matériel virtuel
 
 - **Version de matériel** (`vmx-NN`) : détermine les fonctions disponibles et la compatibilité avec les versions d'ESXi. On ne monte la version que lorsque nécessaire, car elle ne peut pas être abaissée.
 - **vCPU** : processeur virtuel, ordonnancé sur un cœur physique. Plus de vCPU n'est pas toujours plus de performance : une VM surdimensionnée attend plus longtemps l'accès aux cœurs.
@@ -643,7 +734,7 @@ La taille du fichier `.vswp` est égale à la mémoire configurée moins la rés
 - **Cartes réseau** : E1000e (émulée, compatible) et **VMXNET3** (paravirtualisée, la plus performante, exige VMware Tools ou le pilote du noyau).
 - **GuestId** : indique le système d'exploitation prévu (`ubuntu64Guest`). ESXi s'en sert pour proposer les périphériques et paramètres par défaut. Un GuestId incorrect n'empêche pas de démarrer mais peut dégrader les performances ou les fonctions.
 
-### Cours : les formats de disque
+### Les formats de disque
 
 | Format (PowerCLI) | Allocation | Initialisation | Usage |
 | :--- | :--- | :--- | :--- |
@@ -653,7 +744,7 @@ La taille du fichier `.vswp` est égale à la mémoire configurée moins la rés
 
 Le format thin consomme l'espace réellement écrit : un disque de 10 Go peut n'occuper que quelques centaines de mégaoctets. C'est un choix économique, mais il exige une surveillance de l'espace du datastore.
 
-### Cours : la gestion de la mémoire
+### La gestion de la mémoire
 
 Quand la demande dépasse la mémoire physique, ESXi dispose de plusieurs mécanismes, appliqués selon l'état de pression mémoire de l'hôte :
 
@@ -664,11 +755,11 @@ Quand la demande dépasse la mémoire physique, ESXi dispose de plusieurs mécan
 
 À retenir : la mémoire sur-allouée est possible, mais le swap de l'hôte est le symptôme d'un dimensionnement insuffisant.
 
-### Cours : le cycle de vie d'une VM
+### Le cycle de vie d'une VM
 
 Création, configuration, démarrage, suspension, snapshot, clonage, migration, export, suppression. Les états d'alimentation sont `PoweredOn`, `PoweredOff` et `Suspended`. Une VM sans VMware Tools ne reçoit pas d'ordre d'arrêt propre : il faut la mettre hors tension.
 
-### Cours : pourquoi `-NetworkName` échoue sur un hôte autonome
+### Pourquoi `-NetworkName` échoue sur un hôte autonome
 
 À la création, `New-VM -NetworkName` cherche le port group dans l'inventaire PowerCLI. Sur un ESXi autonome, cette résolution par nom peut échouer (`network doesn't exist on host`) alors que le port group existe. La méthode fiable consiste à créer la VM sans réseau, puis à attacher la carte avec l'objet port group, qui évite toute résolution par nom. C'est un exemple typique de contournement par objet.
 
@@ -690,21 +781,30 @@ Création, configuration, démarrage, suspension, snapshot, clonage, migration, 
 4. Pourquoi une VM sans VMware Tools est-elle limitée ?
    Réponse : pas d'arrêt propre, pas de ballooning, pas de pilotes paravirtualisés ni de remontée d'informations de l'invité.
 
-### Commandes
+Crée une VM d'un vCPU, 1 Go de RAM et 10 Go de disque sur `ds-iscsi01`, sans carte réseau.
 
 ```powershell
 $ds = Get-Datastore -Name 'ds-iscsi01'
 New-VM -Name 'VM-Network-Test' -VMHost $vmhost -Datastore $ds -NumCpu 1 -MemoryGB 1 -DiskGB 10 -GuestId 'ubuntu64Guest' -Confirm:$false
 ```
 
-Crée une VM d'un vCPU, 1 Go de RAM et 10 Go de disque sur `ds-iscsi01`, sans carte réseau.
+<img width="1416" height="420" alt="image" src="https://github.com/user-attachments/assets/2006a1d3-d43c-40d1-9e2d-55260cfd8e2c" />
+<img width="1411" height="575" alt="image" src="https://github.com/user-attachments/assets/ec8a19ef-a0f8-455e-9cc6-01b57c39493f" />
+
+
+Ajoute une carte réseau connectée au port group par défaut `VM Network`. `-StartConnected` connecte la carte au démarrage de la VM.
 
 ```powershell
 $vm = Get-VM -Name 'VM-Network-Test'
 New-NetworkAdapter -VM $vm -NetworkName 'VM Network' -StartConnected -Confirm:$false
 ```
 
-Ajoute une carte réseau connectée au port group par défaut `VM Network`. `-StartConnected` connecte la carte au démarrage de la VM.
+<img width="1255" height="422" alt="image" src="https://github.com/user-attachments/assets/7d186fec-fbd1-4242-8084-7e8c16636883" />
+<img width="1415" height="555" alt="image" src="https://github.com/user-attachments/assets/8b6e9ad2-ade3-4edd-a2d9-c723d5737225" />
+<img width="1402" height="570" alt="image" src="https://github.com/user-attachments/assets/24792f35-8082-4322-a35a-e9ece6e0d043" />
+
+
+Récupère l'objet port group, sélectionne la dernière carte de la VM, puis la bascule sur le VLAN 10 en passant l'objet et non le nom. C'est ce passage par objet qui contourne tout.
 
 ```powershell
 $pg = Get-VirtualPortGroup -VMHost $vmhost -Name 'VLAN10-Serveurs'
@@ -712,14 +812,20 @@ $nic = Get-NetworkAdapter -VM $vm | Select-Object -Last 1
 Set-NetworkAdapter -NetworkAdapter $nic -Portgroup $pg -Confirm:$false
 ```
 
-Récupère l'objet port group, sélectionne la dernière carte de la VM, puis la bascule sur le VLAN 10 en passant l'objet et non le nom. C'est ce passage par objet qui contourne le bug.
+<img width="1316" height="417" alt="image" src="https://github.com/user-attachments/assets/fcbf7262-3e85-4903-8a27-cb1536d1e1eb" />
+
+
+Démarre la VM puis affiche, pour chaque carte, le réseau attaché et le type d'adaptateur, afin de valider la configuration.
 
 ```powershell
 Start-VM -VM 'VM-Network-Test' -Confirm:$false
 Get-NetworkAdapter -VM 'VM-Network-Test' | Select-Object NetworkName, Type
 ```
 
-Démarre la VM puis affiche, pour chaque carte, le réseau attaché et le type d'adaptateur, afin de valider la configuration.
+<img width="1207" height="422" alt="image" src="https://github.com/user-attachments/assets/9e4b9cce-2424-4a5b-aefb-dbfa0a7d96eb" />
+<img width="1402" height="562" alt="image" src="https://github.com/user-attachments/assets/2f89f472-5f60-4ab4-8bb9-c63a1f6b995d" />
+
+
 
 ---
 
@@ -747,7 +853,7 @@ Un snapshot enregistre :
 
 C'est pourquoi un retour en arrière annule aussi les changements de matériel, comme l'ajout d'une carte réseau dans le lab.
 
-### Cours : les options de création
+### Les options de création
 
 | Option | Effet | Coût | Quand l'utiliser |
 | :--- | :--- | :--- | :--- |
@@ -757,7 +863,7 @@ C'est pourquoi un retour en arrière annule aussi les changements de matériel, 
 
 Quiesce nécessite VMware Tools. Sans lui, l'option échoue ou n'a pas d'effet.
 
-### Cours : les opérations
+### Les opérations
 
 | Opération | Effet |
 | :--- | :--- |
@@ -768,7 +874,7 @@ Quiesce nécessite VMware Tools. Sans lui, l'option échoue ou n'a pas d'effet.
 
 Une confusion fréquente est de croire que supprimer un snapshot revient en arrière. C'est l'inverse : la suppression valide l'état actuel en fusionnant les deltas, alors que le revert l'abandonne.
 
-### Cours : limites et risques
+### Limites et risques
 
 - Les performances se dégradent quand la chaîne s'allonge, car chaque lecture peut traverser plusieurs deltas.
 - Un delta grossit à chaque écriture et peut atteindre la taille du disque d'origine. Il peut remplir un datastore.
@@ -798,32 +904,46 @@ Les deltas dépendent du disque de base et sont stockés sur le même datastore.
 4. L'ajout d'une carte réseau avant un revert est-il conservé ?
    Réponse : non, la configuration matérielle revient à celle du snapshot.
 
-### Commandes
+Crée un snapshot sans mémoire ni mise au repos du système de fichiers. Rapide, adapté à une VM de test.
 
 ```powershell
 New-Snapshot -VM 'VM-Network-Test' -Name 'Snap-Avant-Modif' -Description 'Snapshot de test' -Memory:$false -Quiesce:$false
 ```
 
-Crée un snapshot sans mémoire ni mise au repos du système de fichiers. Rapide, adapté à une VM de test.
+<img width="1411" height="362" alt="image" src="https://github.com/user-attachments/assets/b9dadab5-cfe4-413b-a50f-0e2b7ce2b7ca" />
+<img width="1405" height="565" alt="image" src="https://github.com/user-attachments/assets/70059abe-6b5f-46f3-92c1-1a4b9ade8492" />
+
+
+Effectue une modification de matériel (ajout d'une carte réseau) afin de pouvoir constater ensuite son annulation.
 
 ```powershell
 New-NetworkAdapter -VM 'VM-Network-Test' -NetworkName 'VM Network' -Confirm:$false
 ```
 
-Effectue une modification de matériel (ajout d'une carte réseau) afin de pouvoir constater ensuite son annulation.
+<img width="1245" height="372" alt="image" src="https://github.com/user-attachments/assets/8b61d337-77c6-48c2-b9d3-47291d44a390" />
+<img width="1411" height="571" alt="image" src="https://github.com/user-attachments/assets/54b71ead-e4cd-4ada-b04b-d70a3dfca709" />
+
+
+Retrouve le snapshot puis y revient. La carte ajoutée à l'étape précédente disparaît.
 
 ```powershell
 $snap = Get-Snapshot -VM 'VM-Network-Test' -Name 'Snap-Avant-Modif'
 Set-VM -VM 'VM-Network-Test' -Snapshot $snap -Confirm:$false
 ```
 
-Retrouve le snapshot puis y revient. La carte ajoutée à l'étape précédente disparaît.
+<img width="1261" height="342" alt="image" src="https://github.com/user-attachments/assets/a90ddb8d-d8c2-452d-9a41-e0f39e614c23" />
+<img width="1417" height="567" alt="image" src="https://github.com/user-attachments/assets/7e4415ed-b1f5-4c52-85a2-2dcef25568c1" />
+
+
+Supprime le snapshot et consolide les disques delta.
 
 ```powershell
 Remove-Snapshot -Snapshot $snap -Confirm:$false
 ```
 
-Supprime le snapshot et consolide les disques delta.
+<img width="891" height="150" alt="image" src="https://github.com/user-attachments/assets/a492216e-3d06-4487-aa15-fe3cce892d01" />
+
+
 
 ---
 
@@ -833,7 +953,7 @@ Supprime le snapshot et consolide les disques delta.
 
 À la fin de cette phase, l'étudiant sait expliquer comment une VM accède à un média optique virtuel, comprendre le rôle de la Content Library et son incompatibilité avec le montage direct sur un hôte autonome, naviguer dans un datastore avec PowerShell, configurer le démarrage sur CD et détacher l'ISO après installation.
 
-### Cours : les médias d'une VM
+### Les médias d'une VM
 
 Le lecteur CD/DVD virtuel d'une VM peut être associé à trois types de support :
 
@@ -845,24 +965,24 @@ Le lecteur CD/DVD virtuel d'une VM peut être associé à trois types de support
 
 Le lab utilise le premier type, le seul adapté à l'automatisation. Le chemin se note `[datastore] dossier/fichier.iso`. L'option `StartConnected` connecte le lecteur à chaque démarrage de la VM.
 
-### Cours : la Content Library
+### La Content Library
 
 La Content Library est un service de vCenter qui centralise modèles de VM, OVF et ISO, avec possibilité de publication et d'abonnement entre sites. Physiquement, ses éléments sont stockés dans des dossiers du datastore nommés `contentlib-<UUID>`, avec des sous dossiers et des noms de fichiers à base d'identifiants. Ces fichiers sont gérés par le service : ils ne sont pas destinés à un montage direct par une VM.
 
 Sur un hôte autonome, l'API refuse de monter une ISO située dans ces dossiers (`Invalid configuration for device '0'`). La solution est de copier l'ISO dans un dossier ordinaire du datastore, comme `ISO`, puis de monter la copie.
 
-### Cours : parcourir un datastore avec PowerShell
+### Parcourir un datastore avec PowerShell
 
 Le fournisseur `VimDatastore` expose un datastore comme un lecteur de fichiers. Après `New-PSDrive`, on utilise les commandes habituelles (`Get-ChildItem`, `New-Item`, `Copy-DatastoreItem`) avec des chemins de la forme `ds:\dossier\fichier`. Il faut démonter le lecteur avec `Remove-PSDrive` à la fin. Le même résultat est possible depuis l'onglet de navigation du datastore dans le Host Client.
 
-### Cours : le démarrage de la VM
+### Le démarrage de la VM
 
 - **Firmware** : une VM démarre en BIOS ou en UEFI. UEFI est nécessaire pour Secure Boot et certains systèmes récents.
 - **Ordre de démarrage** : liste des périphériques testés (disque, CD, réseau). Quand le premier périphérique n'est pas amorçable, la VM passe au suivant de la liste.
 - **`bios.bootDeviceClasses`** : paramètre avancé du fichier `.vmx` qui précise les classes de périphériques autorisées au démarrage. La valeur `allow:cd,hd` autorise le CD puis le disque. On l'écrit via l'objet API `VirtualMachineConfigSpec` et `extraConfig` quand la cmdlet de gestion de l'ordre de démarrage est défaillante.
 - On modifie ce paramètre VM éteinte, pour qu'il soit pris en compte au démarrage suivant.
 
-### Cours : après l'installation
+### Après l'installation
 
 Une fois le système installé, il faut déconnecter l'ISO pour que la VM ne redémarre pas sur l'installateur à chaque fois :
 
@@ -894,7 +1014,9 @@ Photon OS est une distribution Linux légère de VMware, conçue pour les conten
 4. Que fait `Remove-PSDrive -Name ds` ?
    Réponse : il démonte le lecteur PowerShell qui représentait le datastore.
 
-### Commandes
+### Configuration
+
+Monte le datastore comme lecteur `ds:` puis crée le dossier `ISO` s'il n'existe pas. `Out-Null` masque la sortie du montage.
 
 ```powershell
 $ds = Get-Datastore -Name 'ds-iscsi01'
@@ -902,7 +1024,11 @@ New-PSDrive -Name ds -PSProvider VimDatastore -Root '\' -Location $ds | Out-Null
 New-Item -Path ds:\ISO -ItemType Directory -ErrorAction SilentlyContinue
 ```
 
-Monte le datastore comme lecteur `ds:` puis crée le dossier `ISO` s'il n'existe pas. `Out-Null` masque la sortie du montage.
+<img width="1176" height="300" alt="image" src="https://github.com/user-attachments/assets/70e219f7-0630-432c-86c8-a46cf8112356" />
+<img width="1396" height="562" alt="image" src="https://github.com/user-attachments/assets/7ed66413-b918-4f40-a55e-b01f72740ed5" />
+
+
+Copie l'ISO Photon OS depuis la Content Library vers `ds:\ISO\photon.iso`. 
 
 ```powershell
 $sourceIso = "ds:\contentlib-1016f267-18c0-4796-bb78-98a2cf230a70\f63e27c2-89ce-47a3-a1b0-0218673c75ae\photon-minimal-5.0-dde71ec57.x86_64_27fd3db5-01d9-468e-aea4-8df41090cea9.iso"
@@ -910,14 +1036,22 @@ $destIso = "ds:\ISO\photon.iso"
 Copy-DatastoreItem -Item $sourceIso -Destination $destIso
 ```
 
-Copie l'ISO Photon OS depuis la Content Library vers `ds:\ISO\photon.iso`. Les identifiants `contentlib` sont propres à votre instance de lab et doivent être adaptés.
+<img width="1411" height="297" alt="image" src="https://github.com/user-attachments/assets/a059d353-089c-4f4d-af39-596e40cf2f1a" />
+<img width="1405" height="557" alt="image" src="https://github.com/user-attachments/assets/021042fa-1670-41f3-be03-6688cdc03853" />
+
+
+Arrête la VM (l'erreur est ignorée si elle l'est déjà) puis ajoute un lecteur CD pointant vers l'ISO. La syntaxe `[datastore] dossier/fichier` est le format de chemin natif de VMware.
 
 ```powershell
 Stop-VM -VM 'VM-Network-Test' -Confirm:$false -ErrorAction SilentlyContinue
 New-CDDrive -VM 'VM-Network-Test' -ISOPath '[ds-iscsi01] ISO/photon.iso' -StartConnected -Confirm:$false
 ```
 
-Arrête la VM (l'erreur est ignorée si elle l'est déjà) puis ajoute un lecteur CD pointant vers l'ISO. La syntaxe `[datastore] dossier/fichier` est le format de chemin natif de VMware.
+<img width="1406" height="402" alt="image" src="https://github.com/user-attachments/assets/f4898aaf-a335-48bb-ba25-c684d58bbb18" />
+<img width="1420" height="567" alt="image" src="https://github.com/user-attachments/assets/009487d0-ec26-4c96-a90d-8d35e9fcfd82" />
+
+
+Utilise l'objet API natif (`Get-View`) pour écrire le paramètre `bios.bootDeviceClasses` avec la valeur `allow:cd,hd`. La VM peut alors démarrer sur le CD puis sur le disque. Cela contourne le dysfonctionnement de la cmdlet de gestion du boot order.
 
 ```powershell
 $vm = Get-VM -Name 'VM-Network-Test'
@@ -930,14 +1064,23 @@ $spec.extraConfig = @($opt)
 $vmView.ReconfigVM($spec)
 ```
 
-Utilise l'objet API natif (`Get-View`) pour écrire le paramètre `bios.bootDeviceClasses` avec la valeur `allow:cd,hd`. La VM peut alors démarrer sur le CD puis sur le disque. Cela contourne le dysfonctionnement de la cmdlet de gestion du boot order.
+<img width="1155" height="322" alt="image" src="https://github.com/user-attachments/assets/92adf82e-49a4-46a7-835d-2c574eb44688" />
+<img width="652" height="115" alt="image" src="https://github.com/user-attachments/assets/53929241-35fc-4c84-9e73-c8c75ace8167" />
+<img width="1421" height="562" alt="image" src="https://github.com/user-attachments/assets/cf25c99b-c9cd-4b98-99fa-3600a22bddb5" />
 
+
+
+Démarre la VM puis démonte le lecteur `ds:` pour libérer la ressource.
 ```powershell
 Start-VM -VM 'VM-Network-Test' -Confirm:$false
 Remove-PSDrive -Name ds
 ```
 
-Démarre la VM puis démonte le lecteur `ds:` pour libérer la ressource.
+<img width="1206" height="372" alt="image" src="https://github.com/user-attachments/assets/a8bfe27e-6e10-498c-85d5-07f326faf8c7" />
+<img width="1412" height="566" alt="image" src="https://github.com/user-attachments/assets/4042af47-580e-4a39-a5bc-816b6f727f97" />
+
+
+
 
 ---
 
@@ -947,7 +1090,7 @@ Démarre la VM puis démonte le lecteur `ds:` pour libérer la ressource.
 
 À la fin de cette phase, l'étudiant sait classer les types de migration de VM, expliquer pourquoi le Storage vMotion est indisponible sur un hôte autonome, décrire la structure d'un disque VMDK, appliquer une méthode correcte de migration à froid et mesurer ses conséquences.
 
-### Cours : les types de migration
+### Les types de migration
 
 | Type | VM | Ce qui bouge | Prérequis | Disponible sur hôte autonome |
 | :--- | :--- | :--- | :--- | :--- |
@@ -959,11 +1102,11 @@ Démarre la VM puis démonte le lecteur `ds:` pour libérer la ressource.
 
 Les migrations à chaud reposent sur des services de vCenter. C'est pourquoi `Move-HardDisk` renvoie `The operation is not supported` sur un hôte seul.
 
-### Cours : la structure d'un disque VMDK
+### La structure d'un disque VMDK
 
 Un disque est formé de deux fichiers qui forment un tout : le descripteur `.vmdk` et le fichier de données `-flat.vmdk`. Le descripteur référence le fichier de données par son nom. Copier uniquement le descripteur crée un disque qui pointe vers un fichier absent, d'où `disk path is not accessible`. Cette erreur illustre l'importance de traiter le couple comme un seul objet.
 
-### Cours : méthodes de déplacement à froid
+### Méthodes de déplacement à froid
 
 | Méthode | Principe | Avantage | Limite |
 | :--- | :--- | :--- | :--- |
@@ -1014,32 +1157,46 @@ Remarque : `Remove-HardDisk` sans `-DeletePermanently` détache seulement le dis
 4. Comment enregistrer une VM déplacée dans l'inventaire ?
    Réponse : avec `New-VM -VMFilePath '[datastore] dossier/VM.vmx' -VMHost $vmhost`.
 
-### Commandes
+### Configuration
+
+Éteint la VM, prérequis d'une migration à froid.
 
 ```powershell
 Stop-VM -VM 'VM-Network-Test' -Confirm:$false
 ```
 
-Éteint la VM, prérequis d'une migration à froid.
+<img width="917" height="342" alt="image" src="https://github.com/user-attachments/assets/be586c34-7b75-46d9-b62a-319b38b59ab0" />
+
+
+Détache le disque de la VM. Sans l'option `-DeletePermanently`, les fichiers restent présents sur l'ancien datastore, ils ne sont simplement plus référencés.
 
 ```powershell
 Get-HardDisk -VM 'VM-Network-Test' | Remove-HardDisk -Confirm:$false -ErrorAction SilentlyContinue
 ```
 
-Détache le disque de la VM. Sans l'option `-DeletePermanently`, les fichiers restent présents sur l'ancien datastore, ils ne sont simplement plus référencés.
+<img width="1382" height="181" alt="image" src="https://github.com/user-attachments/assets/1a119ab7-16de-472c-942a-6771ccebf845" />
+
+
+Crée un disque de 10 Go en provisionnement dynamique directement sur `ds-iscsi02` et l'attache à la VM.
 
 ```powershell
 New-HardDisk -VM 'VM-Network-Test' -CapacityGB 10 -Datastore (Get-Datastore -Name 'ds-iscsi02') -StorageFormat Thin -Confirm:$false
 ```
 
-Crée un disque de 10 Go en provisionnement dynamique directement sur `ds-iscsi02` et l'attache à la VM.
+<img width="1397" height="392" alt="image" src="https://github.com/user-attachments/assets/823849e7-b1c0-430b-8de9-fc9c7898bc93" />
+<img width="1412" height="562" alt="image" src="https://github.com/user-attachments/assets/e21848a2-1b94-4070-94d9-8c807539cf2e" />
+
+
+Vérifie que le chemin du disque pointe bien vers `[ds-iscsi02]`, puis redémarre la VM.
 
 ```powershell
 Get-HardDisk -VM 'VM-Network-Test' | Select-Object Filename
 Start-VM -VM 'VM-Network-Test' -Confirm:$false
 ```
 
-Vérifie que le chemin du disque pointe bien vers `[ds-iscsi02]`, puis redémarre la VM.
+<img width="1117" height="392" alt="image" src="https://github.com/user-attachments/assets/801817cd-f77a-4439-a721-401412cd5796" />
+
+
 
 ---
 
@@ -1049,7 +1206,7 @@ Vérifie que le chemin du disque pointe bien vers `[ds-iscsi02]`, puis redémarr
 
 À la fin de cette phase, l'étudiant sait expliquer la défense en profondeur appliquée à ESXi, comprendre le rôle des services de l'hôte et de leurs politiques de démarrage, justifier l'importance de la synchronisation horaire et appliquer les premières mesures de durcissement.
 
-### Cours : la défense en profondeur
+### La défense en profondeur
 
 La sécurité d'un hôte ne repose jamais sur une seule mesure. On empile des couches complémentaires :
 
@@ -1063,7 +1220,7 @@ La sécurité d'un hôte ne repose jamais sur une seule mesure. On empile des co
 
 La démarche est cyclique : définir une base de référence, mesurer l'écart, corriger, vérifier, recommencer. Les référentiels courants sont le Security Configuration Guide de VMware, le benchmark CIS pour ESXi et les guides DISA STIG.
 
-### Cours : les services de l'hôte
+### Les services de l'hôte
 
 ESXi exécute des services identifiés par une clé. Les plus importants :
 
@@ -1078,7 +1235,7 @@ ESXi exécute des services identifiés par une clé. Les plus importants :
 
 La **politique de démarrage** d'un service prend trois valeurs : `on` (démarre avec l'hôte), `off` (démarrage manuel) et `automatic` (démarre et s'arrête selon l'ouverture des ports du pare-feu). Changer la politique ne démarre ni n'arrête le service : c'est une action distincte (`Start-VMHostService`, `Stop-VMHostService`).
 
-### Cours : pourquoi le temps est critique
+### Pourquoi le temps est critique
 
 Une horloge dérivante provoque des problèmes difficiles à diagnostiquer :
 
@@ -1118,7 +1275,9 @@ On synchronise donc l'hôte sur une ou plusieurs sources NTP fiables. En product
 4. Pourquoi l'écart d'horloge pose-t-il problème avec Active Directory ?
    Réponse : Kerberos rejette les tickets lorsque l'écart dépasse la tolérance, environ cinq minutes.
 
-### Commandes
+### Configuration
+
+Déclare deux serveurs NTP publics puis les ajoute à l'hôte par une boucle. Prévoir une sortie Internet ou un serveur NTP interne ; dans HOL, l'accès externe peut être filtré.
 
 ```powershell
 $esxi = Get-VMHost -Name "esx-03a.vcf.sddc.lab"
@@ -1126,7 +1285,10 @@ $ntpServers = "0.pool.ntp.org", "1.pool.ntp.org"
 $ntpServers | ForEach-Object { Add-VMHostNtpServer -VMHost $esxi -NtpServer $_ }
 ```
 
-Déclare deux serveurs NTP publics puis les ajoute à l'hôte par une boucle. Prévoir une sortie Internet ou un serveur NTP interne ; dans HOL, l'accès externe peut être filtré.
+<img width="1240" height="312" alt="image" src="https://github.com/user-attachments/assets/d41a5047-b393-41dc-bd9c-f42dbc64f117" />
+
+
+Récupère le service `ntpd`, le démarre, puis règle sa politique sur `on` pour qu'il redémarre avec l'hôte.
 
 ```powershell
 $svc = $esxi | Get-VMHostService | Where-Object { $_.Key -eq "ntpd" }
@@ -1134,20 +1296,24 @@ Start-VMHostService -HostService $svc
 Set-VMHostService -HostService $svc -Policy "on"
 ```
 
-Récupère le service `ntpd`, le démarre, puis règle sa politique sur `on` pour qu'il redémarre avec l'hôte.
+<img width="1195" height="511" alt="image" src="https://github.com/user-attachments/assets/78bb2a18-7252-4fd0-bd0a-3bf32d7c1c26" />
+
+Passe la politique du service SSH sur `off` pour qu'il ne démarre plus automatiquement. Cette commande ne l'arrête pas s'il est déjà en cours ; utiliser `Stop-VMHostService` pour cela.
 
 ```powershell
 Get-VMHost | Get-VMHostService | Where-Object {$_.Key -eq "TSM-SSH"} | Set-VMHostService -Policy "off" -Confirm:$false
 ```
+<img width="1407" height="307" alt="image" src="https://github.com/user-attachments/assets/c4d492cf-8916-48d2-a9c7-2550050619aa" />
 
-Passe la politique du service SSH sur `off` pour qu'il ne démarre plus automatiquement. Cette commande ne l'arrête pas s'il est déjà en cours ; utiliser `Stop-VMHostService` pour cela.
+
+Contrôle la liste des serveurs NTP configurés, puis l'état d'exécution (`Running`) et la politique du service `ntpd`.
 
 ```powershell
 Get-VMHostNtpServer -VMHost $esxi
 Get-VMHostService -VMHost $esxi | Where-Object { $_.Key -eq "ntpd" } | Select-Object Key, Running, Policy
 ```
+<img width="1406" height="372" alt="image" src="https://github.com/user-attachments/assets/361fc89b-eba5-4712-8636-6a1302749c20" />
 
-Contrôle la liste des serveurs NTP configurés, puis l'état d'exécution (`Running`) et la politique du service `ntpd`.
 
 ---
 
@@ -1157,7 +1323,7 @@ Contrôle la liste des serveurs NTP configurés, puis l'état d'exécution (`Run
 
 À la fin de cette phase, l'étudiant sait expliquer ce qu'est esxcli et pourquoi on l'utilise via PowerCLI, comparer les modes V1 et V2, explorer l'arborescence des commandes, décrire le fonctionnement du pare-feu de l'hôte et restreindre l'accès à un service par adresse source.
 
-### Cours : qu'est-ce qu'esxcli ?
+### Qu'est-ce qu'esxcli ?
 
 `esxcli` est l'interface de commande native d'ESXi. Elle expose des fonctions de bas niveau que les cmdlets de haut niveau ne couvrent pas toujours. Avec `Get-EsxCli`, on l'utilise depuis PowerCLI par l'API, sans activer SSH. C'est préférable du point de vue de la sécurité.
 
@@ -1173,7 +1339,7 @@ Les commandes sont organisées en espaces de noms hiérarchiques :
 | `iscsi` | Configuration iSCSI | `iscsi.adapter.list` |
 | `vm` | Processus de VM en cours | `vm.process.list` |
 
-### Cours : mode V1 et mode V2
+### Mode V1 et mode V2
 
 | Critère | V1 | V2 (`-V2`) |
 | :--- | :--- | :--- |
@@ -1184,18 +1350,8 @@ Les commandes sont organisées en espaces de noms hiérarchiques :
 
 Le schéma V2 : récupérer l'objet commande, appeler `CreateArgs()`, renseigner les propriétés, puis `Invoke($args)`. Pour une commande sans argument : `Invoke()`.
 
-Exemples de lecture, sans risque :
 
-```powershell
-$esxcli.system.version.get.Invoke()
-$esxcli.network.nic.list.Invoke() | Select-Object Name, Speed, Link, Driver
-$esxcli.software.vib.list.Invoke() | Select-Object -First 10 Name, Version, AcceptanceLevel
-$esxcli.network.firewall.get.Invoke()
-```
-
-Ces commandes affichent respectivement la version d'ESXi, l'état des cartes physiques, les premiers paquets installés avec leur niveau d'acceptation et la politique générale du pare-feu.
-
-### Cours : le pare-feu d'ESXi
+### Le pare-feu d'ESXi
 
 Le pare-feu d'ESXi est orienté services. Il repose sur trois notions :
 
@@ -1207,7 +1363,7 @@ La politique générale bloque le trafic qui n'est pas explicitement autorisé p
 
 C'est pourquoi l'ajout d'une IP échoue tant que `allowed-all` est vrai (`Cannot add IP when allowed-all is true`) : il faut d'abord le désactiver, puis ajouter les adresses.
 
-### Cours : attention au verrouillage
+### Attention au verrouillage
 
 Désactiver `allowed-all` et n'autoriser qu'un réseau peut vous couper l'accès si votre poste n'appartient pas à ce réseau. Avant de restreindre le service de gestion, il faut s'assurer que l'adresse de l'administrateur y figure. Pour le lab, le service concerné est SSH, qui n'est pas indispensable à PowerCLI (HTTPS), donc le risque est maîtrisé.
 
@@ -1238,13 +1394,19 @@ La notation CIDR `10.0.0.0/24` désigne les adresses de `10.0.0.0` à `10.0.0.25
 4. Comment connaître les arguments d'une commande en V2 ?
    Réponse : afficher l'objet de la commande ou appeler `CreateArgs()` et inspecter ses propriétés.
 
-### Commandes
+### Configuration
+
+Obtient l'accès à l'espace de noms `esxcli` de l'hôte en mode V2.
 
 ```powershell
 $esxcli = Get-EsxCli -VMHost "esx-03a.vcf.sddc.lab" -V2
 ```
 
-Obtient l'accès à l'espace de noms `esxcli` de l'hôte en mode V2.
+<img width="990" height="155" alt="image" src="https://github.com/user-attachments/assets/fc7f9b05-4f8f-465a-aab1-ba7d09f2af86" />
+
+
+Prépare les arguments, cible le ruleset `sshServer` et désactive `allowed-all`. Le service n'est plus ouvert à tous, il devient filtré par liste.
+
 
 ```powershell
 $argsSet = $esxcli.network.firewall.ruleset.set.CreateArgs()
@@ -1253,7 +1415,10 @@ $argsSet.allowedall = $false
 $esxcli.network.firewall.ruleset.set.Invoke($argsSet)
 ```
 
-Prépare les arguments, cible le ruleset `sshServer` et désactive `allowed-all`. Le service n'est plus ouvert à tous, il devient filtré par liste.
+<img width="995" height="256" alt="image" src="https://github.com/user-attachments/assets/f86f344d-f310-4c98-8c99-b67c26fcce0e" />
+
+
+Ajoute le réseau `10.0.0.0/24` à la liste des adresses autorisées pour SSH. Seules les machines de ce sous réseau pourront s'y connecter. Pour contrôler le résultat :
 
 ```powershell
 $argsAdd = $esxcli.network.firewall.ruleset.allowedip.add.CreateArgs()
@@ -1262,13 +1427,16 @@ $argsAdd.rulesetid = "sshServer"
 $esxcli.network.firewall.ruleset.allowedip.add.Invoke($argsAdd)
 ```
 
-Ajoute le réseau `10.0.0.0/24` à la liste des adresses autorisées pour SSH. Seules les machines de ce sous réseau pourront s'y connecter. Pour contrôler le résultat :
+<img width="1257" height="247" alt="image" src="https://github.com/user-attachments/assets/bef75e64-31ea-49e9-93d0-9a6b72653be9" />
+
+
+Affiche les adresses autorisées par ruleset.
 
 ```powershell
 $esxcli.network.firewall.ruleset.allowedip.list.Invoke()
 ```
+<img width="1407" height="647" alt="image" src="https://github.com/user-attachments/assets/99c3dec1-f090-49f9-8ebd-b9559a7586a0" />
 
-Affiche les adresses autorisées par ruleset.
 
 ---
 
@@ -1278,7 +1446,7 @@ Affiche les adresses autorisées par ruleset.
 
 À la fin de cette phase, l'étudiant sait expliquer comment l'hyperviseur partage le CPU et la mémoire, interpréter shares, réservations et limites, calculer l'effet d'une contention, utiliser les resource pools à bon escient et repérer les indicateurs de saturation.
 
-### Cours : l'ordonnancement du CPU
+### L'ordonnancement du CPU
 
 Chaque vCPU est un processus que le VMkernel planifie sur un cœur physique. Quand plus de vCPU veulent s'exécuter que de cœurs disponibles, certains attendent. Le temps d'attente s'appelle le **CPU Ready**. C'est le principal indicateur de saturation du processeur.
 
@@ -1290,7 +1458,7 @@ Règles de lecture :
 
 Le rapport entre vCPU alloués et cœurs physiques s'appelle le taux de sur-allocation (overcommit). Des ratios modestes sont acceptables pour des charges peu actives, mais des charges intensives exigent un ratio proche de un pour un.
 
-### Cours : trois leviers
+### Trois leviers
 
 | Levier | Définition | Agit quand | Effet secondaire |
 | :--- | :--- | :--- | :--- |
@@ -1302,7 +1470,7 @@ Le rapport entre vCPU alloués et cœurs physiques s'appelle le taux de sur-allo
 
 À retenir : une limite est rarement une bonne idée. Elle s'applique même si l'hôte est inoccupé, et une limite mémoire inférieure à la mémoire configurée force le ballooning ou le swap.
 
-### Cours : la mémoire sous contention
+### La mémoire sous contention
 
 L'hôte raisonne en états de pression mémoire (haute, douce, forte, basse) et déclenche progressivement ballooning, compression puis swap. Les compteurs à surveiller sont :
 
@@ -1315,7 +1483,7 @@ L'hôte raisonne en états de pression mémoire (haute, douce, forte, basse) et 
 
 La mémoire consommée élevée n'est pas un problème en soi, car ESXi garde volontiers la mémoire en cache. Ce sont le ballooning et surtout le swap qui signalent un vrai manque.
 
-### Cours : les resource pools
+### Les resource pools
 
 Un resource pool regroupe des VM et leur applique des paramètres communs. Les pools forment une hiérarchie, la racine étant l'hôte (ou le cluster).
 
@@ -1359,33 +1527,44 @@ Points d'attention :
 4. Quelle est la différence entre mémoire consommée et active ?
    Réponse : la consommée est allouée, l'active est réellement utilisée récemment.
 
-### Commandes
+### Configuration
+
+Stocke la VM dans une variable puis affiche sa configuration de ressources actuelle : niveaux de shares, réservations et limites CPU et mémoire. Une limite à `-1` signifie illimité.
 
 ```powershell
 $vm = Get-VM -Name 'VM-Network-Test'
 Get-VMResourceConfiguration -VM $vm | Select-Object VM, CpuSharesLevel, NumCpuShares, CpuReservationMhz, CpuLimitMhz, MemSharesLevel, MemReservationMB, MemLimitMB
 ```
 
-Stocke la VM dans une variable puis affiche sa configuration de ressources actuelle : niveaux de shares, réservations et limites CPU et mémoire. Une limite à `-1` signifie illimité.
+<img width="1405" height="462" alt="image" src="https://github.com/user-attachments/assets/36db2d6a-66a1-4ca9-8290-09af034d2642" />
+
+Passe les shares CPU de la VM au niveau High et lui réserve 512 Mo de mémoire. La VM est désormais prioritaire en cas de contention CPU et dispose d'une mémoire garantie.
+
 
 ```powershell
 Get-VMResourceConfiguration -VM $vm | Set-VMResourceConfiguration -CpuSharesLevel High -MemReservationMB 512
 ```
+<img width="1407" height="322" alt="image" src="https://github.com/user-attachments/assets/7ea84e9c-df6a-4794-8c87-b58fe1492d8a" />
 
-Passe les shares CPU de la VM au niveau High et lui réserve 512 Mo de mémoire. La VM est désormais prioritaire en cas de contention CPU et dispose d'une mémoire garantie.
+
+Crée un resource pool nommé `RP-Production` directement sous l'hôte, avec des shares CPU et mémoire élevés.
+
 
 ```powershell
 $rp = New-ResourcePool -Location $vmhost -Name 'RP-Production' -CpuSharesLevel High -MemSharesLevel High
 ```
 
-Crée un resource pool nommé `RP-Production` directement sous l'hôte, avec des shares CPU et mémoire élevés.
+<img width="1407" height="197" alt="image" src="https://github.com/user-attachments/assets/eff152cd-0f39-4362-bdf9-4c1b0c856150" />
+
+Déplace la VM dans le pool puis liste les VM qu'il contient. **Point d'attention** : si l'hôte refuse l'opération via cette cmdlet, utiliser l'objet API : `$rp.ExtensionData.MoveIntoResourcePool(@($vm.ExtensionData.MoRef))`, ou recréer la VM avec le paramètre `-ResourcePool $rp`.
 
 ```powershell
 Move-VM -VM $vm -Destination $rp
 Get-VM -Location $rp | Select-Object Name, PowerState
 ```
 
-Déplace la VM dans le pool puis liste les VM qu'il contient. **Point d'attention** : si l'hôte refuse l'opération via cette cmdlet, utiliser l'objet API : `$rp.ExtensionData.MoveIntoResourcePool(@($vm.ExtensionData.MoRef))`, ou recréer la VM avec le paramètre `-ResourcePool $rp`.
+<img width="1396" height="377" alt="image" src="https://github.com/user-attachments/assets/c52f19c0-7f69-4e3f-8288-4afe52b7cf71" />
+
 
 ---
 
@@ -1395,7 +1574,7 @@ Déplace la VM dans le pool puis liste les VM qu'il contient. **Point d'attentio
 
 À la fin de cette phase, l'étudiant sait modifier le dimensionnement d'une VM en sécurité, comprendre l'intérêt du hot add et ses effets sur NUMA, étendre un disque jusqu'au système de fichiers invité, expliquer le rôle de VMware Tools et distinguer les opérations d'alimentation.
 
-### Cours : modifier le matériel d'une VM
+### Modifier le matériel d'une VM
 
 | Ressource | À chaud | À froid | Remarque |
 | :--- | :--- | :--- | :--- |
@@ -1408,11 +1587,11 @@ Déplace la VM dans le pool puis liste les VM qu'il contient. **Point d'attentio
 
 Le hot add de vCPU désactive le vNUMA pour cette VM : l'hyperviseur n'expose plus la topologie NUMA à l'invité. Sur des VM de grande taille, cela peut dégrader les performances. C'est un compromis à connaître avant d'activer cette option.
 
-### Cours : NUMA en bref
+### NUMA en bref
 
 Sur un serveur à plusieurs sockets, chaque processeur accède plus vite à sa mémoire locale qu'à celle d'un autre socket. Une VM dont le nombre de vCPU et la mémoire tiennent dans un seul nœud NUMA a de meilleures performances. D'où l'intérêt de ne pas surdimensionner une VM.
 
-### Cours : étendre un disque, étape complète
+### Etendre un disque, étape complète
 
 L'extension se fait en trois niveaux :
 
@@ -1424,7 +1603,7 @@ La première étape seule ne change rien pour l'utilisateur du système invité.
 
 Prérequis : aucun snapshot sur la VM, sinon l'opération échoue.
 
-### Cours : VMware Tools
+### VMware Tools
 
 VMware Tools est un ensemble de pilotes et de services installé dans le système invité :
 
@@ -1436,7 +1615,7 @@ VMware Tools est un ensemble de pilotes et de services installé dans le systèm
 
 Sous Linux, on installe de préférence le paquet de la distribution `open-vm-tools`. Photon OS l'embarque. L'état se lit dans `ExtensionData.Guest.ToolsStatus`, avec les valeurs `toolsOk`, `toolsOld`, `toolsNotRunning` et `toolsNotInstalled`.
 
-### Cours : les opérations d'alimentation
+### Les opérations d'alimentation
 
 | Cmdlet | Effet | Équivalent physique | Tools requis |
 | :--- | :--- | :--- | :--- |
@@ -1467,45 +1646,64 @@ La mise hors tension brutale risque de corrompre des systèmes de fichiers. Pré
 4. Quelle cmdlet arrête proprement une VM ?
    Réponse : `Stop-VMGuest`, si VMware Tools est installé.
 
-### Commandes
+### Configuration
+
+Affiche l'état de la VM, son dimensionnement et l'espace disque provisionné et réellement utilisé. Cette vue sert de référence avant toute modification.
 
 ```powershell
 Get-VM -Name 'VM-Network-Test' | Select-Object Name, PowerState, NumCpu, MemoryGB, ProvisionedSpaceGB, UsedSpaceGB
 ```
 
-Affiche l'état de la VM, son dimensionnement et l'espace disque provisionné et réellement utilisé. Cette vue sert de référence avant toute modification.
+<img width="1406" height="415" alt="image" src="https://github.com/user-attachments/assets/759cac07-d7ca-4e92-b754-dc8516ae3eaa" />
+
+Éteint la VM, passe à 2 vCPU et 2 Go de RAM et renseigne le champ de notes. L'arrêt préalable évite de dépendre du hot add.
 
 ```powershell
 Stop-VM -VM 'VM-Network-Test' -Confirm:$false
 Set-VM -VM 'VM-Network-Test' -NumCpu 2 -MemoryGB 2 -Notes 'VM de test du lab PowerCLI' -Confirm:$false
 ```
 
-Éteint la VM, passe à 2 vCPU et 2 Go de RAM et renseigne le champ de notes. L'arrêt préalable évite de dépendre du hot add.
+<img width="1380" height="391" alt="image" src="https://github.com/user-attachments/assets/31683ecc-ee92-4257-9611-8052807ccc75" />
+<img width="1412" height="565" alt="image" src="https://github.com/user-attachments/assets/cb8bd273-8e1a-4089-ba7e-e5d6d91960b5" />
+
+
+Étend le premier disque à 15 Go. **Point d'attention** : l'opération échoue si la VM possède un snapshot. Supprimer les snapshots avant d'étendre un disque.
 
 ```powershell
 Get-HardDisk -VM 'VM-Network-Test' | Select-Object -First 1 | Set-HardDisk -CapacityGB 15 -Confirm:$false
 ```
 
-Étend le premier disque à 15 Go. **Point d'attention** : l'opération échoue si la VM possède un snapshot. Supprimer les snapshots avant d'étendre un disque.
+<img width="1421" height="372" alt="image" src="https://github.com/user-attachments/assets/5083fb4d-ea6b-4185-b18a-d5f84167513d" />
+<img width="1415" height="570" alt="image" src="https://github.com/user-attachments/assets/a2479ea0-8dc4-4f01-92d6-fa748682fec7" />
+
+
+Ajoute un second disque de 5 Go en thin sur `ds-iscsi02` puis liste tous les disques de la VM avec leur format et leur emplacement.
 
 ```powershell
 New-HardDisk -VM 'VM-Network-Test' -CapacityGB 5 -StorageFormat Thin -Datastore (Get-Datastore -Name 'ds-iscsi02') -Confirm:$false
 Get-HardDisk -VM 'VM-Network-Test' | Select-Object Name, CapacityGB, StorageFormat, Filename
 ```
 
-Ajoute un second disque de 5 Go en thin sur `ds-iscsi02` puis liste tous les disques de la VM avec leur format et leur emplacement.
+<img width="1406" height="537" alt="image" src="https://github.com/user-attachments/assets/94e0b88b-f8c4-4934-bf3e-f29e73c3086b" />
+<img width="1421" height="565" alt="image" src="https://github.com/user-attachments/assets/5822a393-acb1-438f-be83-0fa8826d9ba0" />
+
+
+Lit l'état de VMware Tools via l'objet API de la VM. La valeur `toolsNotInstalled` indique que les arrêts propres ne sont pas disponibles, ce qui est le cas d'une ISO Photon OS qui n'a pas été installée.
 
 ```powershell
 Get-VM -Name 'VM-Network-Test' | Select-Object Name, @{N='ToolsStatus';E={$_.ExtensionData.Guest.ToolsStatus}}
 ```
+<img width="1402" height="332" alt="image" src="https://github.com/user-attachments/assets/8699d644-8fa1-4224-9f81-93c314a20f90" />
 
-Lit l'état de VMware Tools via l'objet API de la VM. La valeur `toolsNotInstalled` indique que les arrêts propres ne sont pas disponibles, ce qui est le cas d'une ISO Photon OS qui n'a pas été installée.
+
+Redémarre la VM avec son nouveau matériel.
 
 ```powershell
 Start-VM -VM 'VM-Network-Test' -Confirm:$false
 ```
 
-Redémarre la VM avec son nouveau matériel.
+<img width="981" height="247" alt="image" src="https://github.com/user-attachments/assets/b2c81f21-fce4-4d52-8189-b2e3c4867718" />
+
 
 ---
 
@@ -1515,7 +1713,7 @@ Redémarre la VM avec son nouveau matériel.
 
 À la fin de cette phase, l'étudiant sait comparer les politiques de répartition de charge, choisir la détection de panne adaptée, définir un ordre de basculement par port group, comprendre l'impact du teaming sur le stockage iSCSI, et dépanner une connectivité réseau avec les outils de l'hôte.
 
-### Cours : le NIC teaming en profondeur
+### Le NIC teaming en profondeur
 
 Le teaming associe plusieurs uplinks pour obtenir de la redondance et, selon la politique, une répartition de charge. Il est important de comprendre que la répartition se fait **par flux ou par port**, jamais paquet par paquet : une VM donnée n'utilise qu'un uplink à un instant donné, sauf avec le hachage IP et plusieurs destinations.
 
@@ -1528,7 +1726,7 @@ Le teaming associe plusieurs uplinks pour obtenir de la redondance et, selon la 
 
 Avec le hachage IP, une configuration incohérente côté physique provoque des pertes de paquets difficiles à diagnostiquer. En cas de doute, rester sur le port d'origine.
 
-### Cours : détection de panne et basculement
+### Détection de panne et basculement
 
 - **Link status** : l'hôte détecte uniquement les pannes du lien direct (câble débranché, port éteint). C'est le mode standard.
 - **Beacon probing** : l'hôte envoie des sondes sur tous les uplinks pour détecter les pannes situées plus loin. Il demande au moins trois uplinks pour être fiable, car avec deux on ne peut pas savoir lequel est défaillant.
@@ -1536,15 +1734,15 @@ Avec le hachage IP, une configuration incohérente côté physique provoque des 
 - **Notify switches** : après un basculement, l'hôte envoie une trame pour que le commutateur mette à jour sa table MAC et redirige immédiatement le trafic. À laisser activé, sauf cas particulier (certains clusters à équilibrage de charge réseau en monodiffusion).
 - **Ordre de basculement** : un uplink est Active (utilisé), Standby (utilisé si un actif tombe) ou Unused (jamais).
 
-### Cours : politique du vSwitch et politique du port group
+### Politique du vSwitch et politique du port group
 
 La politique de teaming est définie sur le vSwitch, puis chaque port group peut la remplacer (override). Cela permet, avec deux uplinks, d'envoyer le VLAN 10 de préférence sur `vmnic1` et le VLAN 20 de préférence sur `vmnic3`, en utilisant chacun comme secours de l'autre. C'est une répartition manuelle efficace sans exigence côté commutateur.
 
-### Cours : cas particulier iSCSI
+### Cas particulier iSCSI
 
 Quand on utilise l'association de ports iSCSI (iSCSI port binding), chaque interface VMkernel dédiée doit avoir **un seul uplink actif** et aucun uplink en secours. Le multipathing iSCSI assure la redondance à la place du teaming. Mélanger les deux est une erreur classique.
 
-### Cours : séparer les flux
+### Séparer les flux
 
 | Flux | Raison de l'isolation |
 | :--- | :--- |
@@ -1555,11 +1753,11 @@ Quand on utilise l'association de ports iSCSI (iSCSI port binding), chaque inter
 
 Sur un hôte autonome comme celui du lab, on ne peut pas faire de vMotion, mais la séparation reste le bon réflexe de conception.
 
-### Cours : CDP et LLDP
+### CDP et LLDP
 
 Ces protocoles de découverte permettent de voir le commutateur physique voisin d'une carte (nom, port, VLAN). Un vSwitch standard prend en charge CDP. LLDP exige un commutateur distribué. L'information est très utile pour vérifier un câblage.
 
-### Cours : diagnostic réseau
+### Diagnostic réseau
 
 | Besoin | Outil | Exemple |
 | :--- | :--- | :--- |
@@ -1589,7 +1787,10 @@ Le test avec `-s 8972 -d` envoie un paquet de 8972 octets sans fragmentation : s
 4. Comment vérifier qu'une MTU de 9000 est cohérente ?
    Réponse : avec `vmkping -I vmkX -s 8972 -d adresse`.
 
-### Commandes
+### Configuration
+
+
+Lit la politique de teaming du vSwitch puis affiche la répartition de charge, la détection de panne, les options de notification et de failback, ainsi que les cartes actives et en secours.
 
 ```powershell
 $vs = Get-VirtualSwitch -VMHost $vmhost -Name 'vSwitch1'
@@ -1597,13 +1798,18 @@ $teaming = Get-NicTeamingPolicy -VirtualSwitch $vs
 $teaming | Select-Object VirtualSwitch, LoadBalancingPolicy, NetworkFailoverDetectionPolicy, NotifySwitches, FailbackEnabled, ActiveNic, StandbyNic
 ```
 
-Lit la politique de teaming du vSwitch puis affiche la répartition de charge, la détection de panne, les options de notification et de failback, ainsi que les cartes actives et en secours.
+<img width="1397" height="490" alt="image" src="https://github.com/user-attachments/assets/50deda6e-8686-421d-aeba-0a5e144c9784" />
+
+
+Applique une politique standard et prévisible : répartition par port virtuel, détection par état du lien, notification des commutateurs et failback activés.
 
 ```powershell
 Set-NicTeamingPolicy -VirtualSwitchPolicy $teaming -LoadBalancingPolicy LoadBalanceSrcId -NetworkFailoverDetectionPolicy LinkStatus -NotifySwitches $true -FailbackEnabled $true
 ```
 
-Applique une politique standard et prévisible : répartition par port virtuel, détection par état du lien, notification des commutateurs et failback activés.
+<img width="1407" height="360" alt="image" src="https://github.com/user-attachments/assets/00a1f975-4262-4e4f-960e-bd9a1012de90" />
+
+Définit un ordre de basculement propre au port group `VLAN20-Clients` : `vmnic1` est active et `vmnic3` en secours. `-InheritFailoverOrder $false` désactive l'héritage de la politique du vSwitch. **Point d'attention** : les deux cartes doivent déjà être des uplinks du vSwitch.
 
 ```powershell
 $pg20 = Get-VirtualPortGroup -VMHost $vmhost -Name 'VLAN20-Clients'
@@ -1612,25 +1818,40 @@ $nic3 = Get-VMHostNetworkAdapter -VMHost $vmhost -Physical -Name 'vmnic3'
 Get-NicTeamingPolicy -VirtualPortGroup $pg20 | Set-NicTeamingPolicy -InheritFailoverOrder $false -MakeNicActive $nic1 -MakeNicStandby $nic3
 ```
 
-Définit un ordre de basculement propre au port group `VLAN20-Clients` : `vmnic1` est active et `vmnic3` en secours. `-InheritFailoverOrder $false` désactive l'héritage de la politique du vSwitch. **Point d'attention** : les deux cartes doivent déjà être des uplinks du vSwitch.
+<img width="1402" height="455" alt="image" src="https://github.com/user-attachments/assets/4ab17776-06b9-462b-89d4-21f6421a6299" />
+
+
+Applique le durcissement de sécurité au niveau du vSwitch entier. Les port groups qui n'ont pas de politique propre en héritent.
+
 
 ```powershell
 Get-SecurityPolicy -VirtualSwitch $vs | Set-SecurityPolicy -AllowPromiscuous $false -ForgedTransmits $false -MacChanges $false -Confirm:$false
 ```
 
-Applique le durcissement de sécurité au niveau du vSwitch entier. Les port groups qui n'ont pas de politique propre en héritent.
+<img width="1411" height="367" alt="image" src="https://github.com/user-attachments/assets/4612d19b-f3c1-47ad-9785-91fc1450aed8" />
+<img width="1405" height="572" alt="image" src="https://github.com/user-attachments/assets/42b7d52d-595e-4f91-86c5-c69ecace078d" />
+<img width="1415" height="570" alt="image" src="https://github.com/user-attachments/assets/11947cf5-0b42-4933-a777-f8c3de8d9134" />
+
+Audite les interfaces VMkernel : adresse, masque, port group et services activés (gestion, vMotion). Permet de détecter une interface qui porte un service qu'elle ne devrait pas porter.
 
 ```powershell
 Get-VMHostNetworkAdapter -VMHost $vmhost -VMKernel | Select-Object Name, IP, SubnetMask, PortGroupName, ManagementTrafficEnabled, VMotionEnabled
 ```
 
-Audite les interfaces VMkernel : adresse, masque, port group et services activés (gestion, vMotion). Permet de détecter une interface qui porte un service qu'elle ne devrait pas porter.
+<img width="1401" height="602" alt="image" src="https://github.com/user-attachments/assets/3db8d7a8-8134-4546-9aa2-e013adf51702" />
+<img width="1335" height="372" alt="image" src="https://github.com/user-attachments/assets/45b19202-c2e2-4aca-a1c2-95ee5d306f9d" />
+
+
+Affiche la configuration réseau globale de l'hôte : nom, domaine, serveurs DNS, domaine de recherche et passerelle VMkernel par défaut. Cette commande est en lecture seule, car modifier le DNS ou la passerelle dans HOL pourrait couper l'accès à l'hôte.
+
 
 ```powershell
 Get-VMHostNetwork -VMHost $vmhost | Select-Object HostName, DomainName, DnsAddress, SearchDomain, VMKernelGateway
 ```
 
-Affiche la configuration réseau globale de l'hôte : nom, domaine, serveurs DNS, domaine de recherche et passerelle VMkernel par défaut. Cette commande est en lecture seule, car modifier le DNS ou la passerelle dans HOL pourrait couper l'accès à l'hôte.
+<img width="1402" height="442" alt="image" src="https://github.com/user-attachments/assets/8e9d1633-a671-4bcc-8f22-d29919872b61" />
+
+
 
 ---
 
@@ -1640,7 +1861,7 @@ Affiche la configuration réseau globale de l'hôte : nom, domaine, serveurs DNS
 
 À la fin de cette phase, l'étudiant sait décrire une session iSCSI, comparer découverte dynamique et statique, expliquer le multipathing et ses politiques, interpréter les indicateurs de latence de stockage et connaître les situations APD et PDL.
 
-### Cours : la configuration iSCSI de bout en bout
+### La configuration iSCSI de bout en bout
 
 Les étapes pour connecter un hôte à une baie iSCSI :
 
@@ -1655,7 +1876,7 @@ La découverte dynamique interroge le portail et récupère toutes les cibles : 
 
 Le CHAP authentifie l'initiateur auprès de la cible (unidirectionnel) ou les deux parties l'une envers l'autre (mutuel). Le secret est partagé : il se protège comme un mot de passe.
 
-### Cours : l'architecture de gestion des chemins
+### L'architecture de gestion des chemins
 
 ```text
         VM  ->  Datastore VMFS  ->  Périphérique (LUN)
@@ -1678,7 +1899,7 @@ Le CHAP authentifie l'initiateur auprès de la cible (unidirectionnel) ou les de
 
 La bonne politique dépend de la baie. On suit la recommandation du constructeur, souvent `RoundRobin` pour les baies actif-actif.
 
-### Cours : états des chemins et situations de panne
+### Etats des chemins et situations de panne
 
 - **Active** : chemin utilisable pour les E/S. **Standby** : disponible mais non utilisé. **Dead** : chemin perdu.
 - **APD (All Paths Down)** : tous les chemins vers un périphérique sont perdus, mais on ne sait pas si c'est définitif. L'hôte réessaie un temps, puis arrête les E/S : les VM se figent.
@@ -1686,7 +1907,7 @@ La bonne politique dépend de la baie. On suit la recommandation du constructeur
 
 Ces deux situations expliquent pourquoi un incident de stockage peut se manifester par des VM qui ne répondent plus sans panne visible de l'hôte.
 
-### Cours : mesurer les performances de stockage
+### Mesurer les performances de stockage
 
 La latence se décompose en couches :
 
@@ -1698,11 +1919,11 @@ La latence se décompose en couches :
 
 Un KAVG élevé indique une file d'attente saturée côté hôte, un DAVG élevé pointe la baie ou le réseau. Ces valeurs sont des repères, à confirmer par le contexte (type de charge, support).
 
-### Cours : accélérations matérielles (VAAI)
+### Accélérations matérielles (VAAI)
 
 L'API VAAI permet à l'hôte de déléguer à la baie des opérations coûteuses : verrouillage atomique (ATS), copie de blocs (clonage), mise à zéro de blocs et libération d'espace (UNMAP). Elle réduit la charge sur l'hôte et le réseau.
 
-### Cours : contrôle des E/S et agrandissement
+### Contrôle des E/S et agrandissement
 
 - **Storage I/O Control** : équilibre l'accès au stockage entre VM d'un datastore partagé selon des shares. Il exige vCenter et une licence adaptée.
 - **Agrandir un datastore** : soit on agrandit le LUN sur la baie puis on étend le datastore dans l'espace libre du LUN, soit on ajoute un LUN supplémentaire comme extension. La première méthode est préférable, car l'extension multiplie les points de défaillance.
@@ -1725,49 +1946,73 @@ L'API VAAI permet à l'hôte de déléguer à la baie des opérations coûteuses
 4. Pourquoi préférer agrandir un LUN plutôt qu'ajouter une extension ?
    Réponse : l'extension multiplie les points de défaillance et complique la gestion.
 
-### Commandes
+### Configuration
+
+Sélectionne l'adaptateur iSCSI logiciel de l'hôte puis affiche son nom de périphérique, son modèle, son IQN et son état.
 
 ```powershell
 $iscsiHba = Get-VMHostHba -VMHost $vmhost -Type iScsi
 $iscsiHba | Select-Object Device, Model, IScsiName, Status
 ```
 
-Sélectionne l'adaptateur iSCSI logiciel de l'hôte puis affiche son nom de périphérique, son modèle, son IQN et son état.
+<img width="1295" height="332" alt="image" src="https://github.com/user-attachments/assets/06093d0e-8e2c-45dc-863e-2359b41babf1" />
+
+Liste les cibles iSCSI configurées, avec leur adresse, leur port et leur type (Send ou Static). Cette commande sert à documenter la connectivité vers FreeNAS.
+
 
 ```powershell
 Get-IScsiHbaTarget -IScsiHba $iscsiHba | Select-Object Address, Port, Type
 ```
 
-Liste les cibles iSCSI configurées, avec leur adresse, leur port et leur type (Send ou Static). Cette commande sert à documenter la connectivité vers FreeNAS.
+<img width="1166" height="357" alt="image" src="https://github.com/user-attachments/assets/f6bc51ba-80d7-4864-8b6f-cd29258f849b" />
 
+
+Créer la NOUVELLE cible (avec une adresse qui n'existe pas encore)
 ```powershell
-# Exemple de référence, à adapter et à ne pas exécuter si la cible est déjà configurée
-New-IScsiHbaTarget -IScsiHba $iscsiHba -Address '10.0.0.50' -Type Send
-Get-VMHostStorage -VMHost $vmhost -RescanAllHba
+New-IScsiHbaTarget -IScsiHba $iscsiHba -Address '10.0.0.51' -Type Send
 ```
 
-Ajoute un portail de découverte dynamique puis relance la détection du stockage. L'adresse `10.0.0.50` est un exemple : utiliser l'adresse réelle de la baie.
+Forcer l'ESXi à aller chercher les nouveaux LUNs sur cette nouvelle cible
+
+```powershell
+Get-VMHostStorage -VMHost (Get-VMHost) -RescanAllHba -RescanVmfs
+```
+
+Vérifier que la nouvelle cible est bien enregistrée
+```powershell
+Get-IScsiHbaTarget -IScsiHba $iscsiHba | Select-Object Address, Port, Type
+```
+
+<img width="1382" height="577" alt="image" src="https://github.com/user-attachments/assets/6ce8d435-8603-441c-ac25-42bdcde1fd58" />
+
+Affiche la politique de chemins de chaque LUN puis tous les chemins vers ces LUN avec leur état. Dans un lab, un LUN n'a souvent qu'un seul chemin.
 
 ```powershell
 Get-ScsiLun -VMHost $vmhost -LunType disk | Select-Object CanonicalName, CapacityGB, MultipathPolicy
 Get-ScsiLun -VMHost $vmhost -LunType disk | Get-ScsiLunPath | Select-Object Name, State, Preferred
 ```
 
-Affiche la politique de chemins de chaque LUN puis tous les chemins vers ces LUN avec leur état. Dans un lab, un LUN n'a souvent qu'un seul chemin.
+<img width="1396" height="517" alt="image" src="https://github.com/user-attachments/assets/aafd713a-57de-468c-b52c-8ef07e45a8e1" />
+
+Passe le LUN de 85 Go (celui de `ds-iscsi01`) en `RoundRobin`. Avec un seul chemin, le gain est nul, mais la commande illustre la méthode. **Point d'attention** : en production, suivre la politique recommandée par le constructeur de la baie.
 
 ```powershell
 Get-ScsiLun -VMHost $vmhost -LunType disk | Where-Object { $_.CapacityGB -eq 85 } | Set-ScsiLun -MultipathPolicy RoundRobin
 ```
+<img width="1406" height="347" alt="image" src="https://github.com/user-attachments/assets/67839977-b9f1-405c-9441-5b12c6925b6f" />
+<img width="1422" height="562" alt="image" src="https://github.com/user-attachments/assets/9d13dec2-49bd-4d75-afce-5332ff1ed55f" />
+<img width="1422" height="580" alt="image" src="https://github.com/user-attachments/assets/a448e13f-92d0-4009-88dc-b072d88f076d" />
 
-Passe le LUN de 85 Go (celui de `ds-iscsi01`) en `RoundRobin`. Avec un seul chemin, le gain est nul, mais la commande illustre la méthode. **Point d'attention** : en production, suivre la politique recommandée par le constructeur de la baie.
+
+Compte les VM présentes sur chaque datastore. Cela donne une vue rapide de la répartition de la charge de stockage.
 
 ```powershell
 foreach ($d in Get-Datastore) {
     "{0} : {1} VM" -f $d.Name, @(Get-VM -Datastore $d).Count
 }
 ```
+<img width="1107" height="252" alt="image" src="https://github.com/user-attachments/assets/599b5b03-d3cc-416d-bf70-adc2a0e1e580" />
 
-Compte les VM présentes sur chaque datastore. Cela donne une vue rapide de la répartition de la charge de stockage.
 
 ---
 
@@ -1791,7 +2036,7 @@ L'autorisation répond à la question « qui a le droit de faire quoi sur quel o
 - **Rôle** : un ensemble nommé de privilèges.
 - **Permission** : association principal, rôle et objet, avec option de propagation aux objets enfants.
 
-### Cours : les rôles
+### Les rôles
 
 | Rôle | Contenu |
 | :--- | :--- |
@@ -1804,14 +2049,14 @@ Il existe aussi des rôles système (`Anonymous`, `View`, `Read`) utilisés en i
 
 Un rôle personnalisé se construit en partant d'un besoin métier (par exemple, un opérateur qui allume et éteint des VM) puis en ajoutant uniquement les privilèges nécessaires. Il est plus sûr de partir de rien que de retirer des droits à un rôle large.
 
-### Cours : propagation et précédence
+### Propagation et précédence
 
 - Avec **Propagate**, la permission s'applique à tous les objets enfants. Sans, elle ne concerne que l'objet ciblé.
 - Une permission posée directement sur un objet l'emporte sur une permission héritée du parent.
 - Si un utilisateur reçoit plusieurs permissions via ses groupes sur un même objet, ses droits sont l'union de ces permissions, sauf si l'une est `NoAccess`, qui l'emporte.
 - Une permission explicite attribuée à l'utilisateur lui-même l'emporte sur celles de ses groupes.
 
-### Cours : comptes locaux d'un hôte autonome
+### Comptes locaux d'un hôte autonome
 
 - Il n'y a pas d'annuaire centralisé : chaque hôte a ses comptes. La gestion multi-hôtes est donc laborieuse, d'où l'intérêt d'automatiser.
 - Le compte `root` a toujours le rôle `Admin`. On évite de l'utiliser au quotidien et on le réserve aux urgences. Ses actions sont difficiles à attribuer à une personne.
@@ -1819,11 +2064,11 @@ Un rôle personnalisé se construit en partant d'un besoin métier (par exemple,
 - L'accès au shell est une autorisation distincte (`-GrantShellAccess`), qu'on n'accorde qu'en cas de besoin.
 - Un hôte peut être joint à un domaine Active Directory pour utiliser des comptes de l'entreprise, mais en environnement vCenter c'est vCenter qui porte l'authentification.
 
-### Cours : politique de mot de passe
+### Politique de mot de passe
 
 ESXi vérifie la complexité (classes de caractères, longueur) via le paramètre avancé `Security.PasswordQualityControl`. Un mot de passe refusé à la création d'un compte est le signe d'une politique non respectée. En production, on combine une longueur élevée, un historique et un verrouillage après échecs répétés (phase suivante).
 
-### Cours : auditer les droits
+### Auditer les droits
 
 Un audit des accès compare l'état réel au besoin. Les questions à poser :
 
@@ -1852,35 +2097,53 @@ Un audit des accès compare l'état réel au besoin. Les questions à poser :
 4. À quel niveau poser une permission ?
    Réponse : au niveau le plus bas qui répond au besoin, avec propagation seulement si nécessaire.
 
-### Commandes
+### Configuration
+
+Crée deux comptes locaux : un compte en lecture seule et un compte d'opérateur. **Point d'attention** : si la création échoue, le mot de passe ne respecte probablement pas la politique de complexité de l'hôte.
 
 ```powershell
 New-VMHostAccount -Id 'opsread' -Password 'Lab#Read2026!' -UserAccount -Description 'Compte exploitation lecture seule'
 New-VMHostAccount -Id 'opsvm' -Password 'Lab#Oper2026!' -UserAccount -Description 'Compte operateur de VM'
 ```
 
-Crée deux comptes locaux : un compte en lecture seule et un compte d'opérateur. **Point d'attention** : si la création échoue, le mot de passe ne respecte probablement pas la politique de complexité de l'hôte.
+<img width="1415" height="501" alt="image" src="https://github.com/user-attachments/assets/a8fd145e-987f-4863-8610-a86d0f19c137" />
+<img width="1416" height="552" alt="image" src="https://github.com/user-attachments/assets/c2150e96-4c30-4ddd-964f-959bbd910aae" />
+
+
+Récupère les privilèges d'allumage, d'extinction et de redémarrage, puis crée un rôle personnalisé qui ne contient que ceux-là. Ce rôle ne permet ni de modifier le matériel ni de supprimer une VM.
 
 ```powershell
 $privs = Get-VIPrivilege -Id 'VirtualMachine.Interact.PowerOn','VirtualMachine.Interact.PowerOff','VirtualMachine.Interact.Reset'
 New-VIRole -Name 'Operateur-VM' -Privilege $privs
 ```
 
-Récupère les privilèges d'allumage, d'extinction et de redémarrage, puis crée un rôle personnalisé qui ne contient que ceux-là. Ce rôle ne permet ni de modifier le matériel ni de supprimer une VM.
+<img width="1402" height="377" alt="image" src="https://github.com/user-attachments/assets/b681b560-dc57-40e7-87f9-a70f4b99f2aa" />
+
+
+Accorde au compte `opsread` la lecture sur tout l'hôte, avec propagation. Accorde au compte `opsvm` le rôle d'opérateur uniquement sur la VM de test, sans propagation.
+
 
 ```powershell
 New-VIPermission -Entity $vmhost -Principal 'opsread' -Role (Get-VIRole -Name 'ReadOnly') -Propagate:$true
 New-VIPermission -Entity (Get-VM -Name 'VM-Network-Test') -Principal 'opsvm' -Role (Get-VIRole -Name 'Operateur-VM') -Propagate:$false
 ```
 
-Accorde au compte `opsread` la lecture sur tout l'hôte, avec propagation. Accorde au compte `opsvm` le rôle d'opérateur uniquement sur la VM de test, sans propagation.
+<img width="1407" height="480" alt="image" src="https://github.com/user-attachments/assets/68ddb8df-8e73-4cf7-baeb-af7eea5aa917" />
+<img width="1412" height="557" alt="image" src="https://github.com/user-attachments/assets/0548946b-653d-4093-ad8c-0f778b67765d" />
+
+<img width="1407" height="562" alt="image" src="https://github.com/user-attachments/assets/60f1f7d0-c3ab-45c4-8846-05c89c2c794e" />
+
+
+Vérifie les permissions posées et la liste des comptes locaux. Le contrôle systématique des droits est une étape d'audit essentielle.
 
 ```powershell
 Get-VIPermission -Entity $vmhost | Select-Object Principal, Role, Entity, Propagate
 Get-VMHostAccount -User | Select-Object Id, Description
 ```
 
-Vérifie les permissions posées et la liste des comptes locaux. Le contrôle systématique des droits est une étape d'audit essentielle.
+<img width="1402" height="592" alt="image" src="https://github.com/user-attachments/assets/318375ed-d654-408c-9f22-c13749b2d751" />
+
+
 
 ---
 
@@ -1890,7 +2153,7 @@ Vérifie les permissions posées et la liste des comptes locaux. Le contrôle sy
 
 À la fin de cette phase, l'étudiant sait situer chaque mesure de durcissement dans une couche de sécurité, régler les paramètres avancés de session et de verrouillage, centraliser les journaux, auditer les services et ports exposés, et expliquer les fonctions de sécurité matérielle et de signature des paquets.
 
-### Cours : les paramètres avancés
+### Les paramètres avancés
 
 Les Advanced Settings sont des centaines de paramètres, regroupés par préfixe (`UserVars`, `Security`, `Syslog`, `Net`, `Mem`, `Disk`). Ils se lisent et se modifient avec `Get-AdvancedSetting` et `Set-AdvancedSetting`. Règle de prudence : consigner la valeur d'origine avant toute modification. Le lab le fait avec la variable `$avant`.
 
@@ -1905,7 +2168,7 @@ Les Advanced Settings sont des centaines de paramètres, regroupés par préfixe
 
 Un timeout de zéro désactive la fonction. Le verrouillage de compte protège contre la force brute, mais peut aussi bloquer un administrateur légitime : prévoir une procédure de déverrouillage.
 
-### Cours : la journalisation
+### La journalisation
 
 Par défaut, les journaux de l'hôte sont conservés localement. Selon la configuration, ils peuvent résider dans un espace temporaire en mémoire et disparaître au redémarrage. D'où la nécessité d'un **serveur syslog distant** qui offre :
 
@@ -1916,14 +2179,14 @@ Par défaut, les journaux de l'hôte sont conservés localement. Selon la config
 
 Le paramètre `Syslog.global.logHost` prend une adresse sous la forme `protocole://hôte:port` (par exemple `udp://serveur:514`, ou `tcp://` et `ssl://` pour un transport fiable ou chiffré). Il faut aussi ouvrir la règle de pare-feu `syslog`, sinon rien n'est transmis.
 
-### Cours : audit de la surface d'attaque
+### Audit de la surface d'attaque
 
 Deux contrôles complémentaires :
 
 1. **Services** : lister avec `Get-VMHostService` ceux qui tournent ou démarrent automatiquement. Tout service non nécessaire est à désactiver.
 2. **Pare-feu** : lister les règles activées avec `Get-VMHostFirewallException`. Chaque port ouvert doit être justifié et, quand c'est possible, restreint par adresse.
 
-### Cours : sécurité du système
+### Sécurité du système
 
 | Mécanisme | Fonction |
 | :--- | :--- |
@@ -1938,7 +2201,7 @@ Les niveaux d'acceptation, du plus strict au plus permissif, sont : `VMwareCerti
 
 Le lockdown mode n'est pas adapté à un hôte autonome : avec lui, il n'y a plus de point de gestion de substitution, et un blocage peut couper définitivement l'accès à l'hôte.
 
-### Cours : TLS et chiffrement
+### TLS et chiffrement
 
 Les versions anciennes du protocole TLS (1.0 et 1.1) sont désactivées dans les versions récentes d'ESXi, qui privilégient TLS 1.2 au minimum. Le chiffrement protège les échanges de gestion. Les données de VM peuvent aussi être chiffrées (VM Encryption), ce qui exige un fournisseur de clés et vCenter.
 
@@ -1968,7 +2231,9 @@ Les versions anciennes du protocole TLS (1.0 et 1.1) sont désactivées dans les
 4. Quel est le risque du verrouillage de compte ?
    Réponse : qu'un administrateur légitime soit bloqué par des échecs répétés.
 
-### Commandes
+### Configuration
+
+Enregistre les valeurs actuelles dans `$avant` avant toute modification, afin de pouvoir revenir en arrière. Il s'agit d'une bonne pratique de gestion du changement.
 
 ```powershell
 $noms = 'UserVars.ESXiShellTimeOut','UserVars.ESXiShellInteractiveTimeOut','UserVars.DcuiTimeOut','Security.AccountLockFailures','Security.AccountUnlockTime'
@@ -1976,7 +2241,10 @@ $avant = Get-AdvancedSetting -Entity $esxi -Name $noms
 $avant | Select-Object Name, Value
 ```
 
-Enregistre les valeurs actuelles dans `$avant` avant toute modification, afin de pouvoir revenir en arrière. Il s'agit d'une bonne pratique de gestion du changement.
+<img width="1401" height="421" alt="image" src="https://github.com/user-attachments/assets/f22a9ad8-a22f-43a3-a643-d1fe45881086" />
+
+
+Fixe le timeout du shell à 10 minutes, le timeout des sessions shell interactives à 5 minutes, le timeout de la console DCUI à 10 minutes, le verrouillage après 5 échecs et le déblocage automatique après 15 minutes.
 
 ```powershell
 Get-AdvancedSetting -Entity $esxi -Name 'UserVars.ESXiShellTimeOut' | Set-AdvancedSetting -Value 600 -Confirm:$false
@@ -1986,34 +2254,108 @@ Get-AdvancedSetting -Entity $esxi -Name 'Security.AccountLockFailures' | Set-Adv
 Get-AdvancedSetting -Entity $esxi -Name 'Security.AccountUnlockTime' | Set-AdvancedSetting -Value 900 -Confirm:$false
 ```
 
-Fixe le timeout du shell à 10 minutes, le timeout des sessions shell interactives à 5 minutes, le timeout de la console DCUI à 10 minutes, le verrouillage après 5 échecs et le déblocage automatique après 15 minutes.
+<img width="1420" height="640" alt="image" src="https://github.com/user-attachments/assets/bc7d18d7-b11b-4f82-ad99-94dc15b36c9b" />
+
+
+
+Définit le message d'avertissement affiché sur l'interface de l'hôte.
 
 ```powershell
 Get-AdvancedSetting -Entity $esxi -Name 'Annotations.WelcomeMessage' | Set-AdvancedSetting -Value 'Acces reserve au personnel autorise. Toute activite est journalisee.' -Confirm:$false
 ```
 
-Définit le message d'avertissement affiché sur l'interface de l'hôte.
+<img width="1406" height="392" alt="image" src="https://github.com/user-attachments/assets/e56876f1-9388-423f-842c-b66927e3f34c" />
+
+
+Vérifier si un serveur syslog est déjà configuré
 
 ```powershell
-# Exemple à adapter : remplacer l'adresse par celle de votre serveur syslog
-Get-AdvancedSetting -Entity $esxi -Name 'Syslog.global.logHost' | Set-AdvancedSetting -Value 'udp://10.0.0.50:514' -Confirm:$false
-Get-VMHostFirewallException -VMHost $esxi -Name 'syslog' | Set-VMHostFirewallException -Enabled $true
+Get-AdvancedSetting -Entity $esxi -Name 'Syslog.global.logHost' | Select-Object Value
 ```
 
-Désigne un serveur syslog distant puis ouvre la règle de pare-feu sortante correspondante. Sans cette seconde commande, les journaux ne partent pas.
+<img width="1356" height="317" alt="image" src="https://github.com/user-attachments/assets/cceb36dc-7ca2-47ab-a2ff-6b7237958832" />
+
+
+Vérifier que l'exception 'syslog' est activée
+
+```powershell
+Get-VMHostFirewallException -VMHost $esxi -Name 'syslog' | Select-Object Name, Enabled
+```
+
+<img width="1237" height="270" alt="image" src="https://github.com/user-attachments/assets/4e6385d5-00b2-463c-8b11-caede6653ee0" />
+
+Le résultat `Enabled` : `False` signifie que l'ESXi est configuré pour envoyer les logs, mais que le pare-feu bloque le trafic sortant.
+
+Activer l'exception de pare-feu pour Syslog
+```powershell
+Get-VMHostFirewallException -VMHost $esxi -Name 'syslog' | Set-VMHostFirewallException -Enabled $true -Confirm:$false
+```
+<img width="1407" height="325" alt="image" src="https://github.com/user-attachments/assets/f496231f-a999-4cb8-a576-0fa9f8a634fd" />
+
+Vérifier que c'est bien activé
+
+```powershell
+Get-VMHostFirewallException -VMHost $esxi -Name 'syslog' | Select-Object Name, Enabled
+```
+
+<img width="1316" height="237" alt="image" src="https://github.com/user-attachments/assets/e3d5e78a-3548-40c3-a273-6e085e0db1c4" />
+
+
+Configurer l'envoi des logs vers le serveur Syslog (ici, le vCenter du lab)
+- Remplacez l'adresse par l'IP ou le FQDN de votre serveur de logs
+
+```powershell
+$syslogServer = "vcsa-01a.vcf.sddc.lab"
+Get-AdvancedSetting -Entity $esxi -Name 'Syslog.global.logHost' | Set-AdvancedSetting -Value "udp://$($syslogServer):514" -Confirm:$false
+```
+
+<img width="1392" height="382" alt="image" src="https://github.com/user-attachments/assets/ba8d7a3c-3ffe-44df-930e-8bb902c0dd43" />
+
+
+- Autoriser le trafic sortant dans le pare-feu de l'ESXi (Port 514 UDP)
+
+```powershell
+Get-VMHostFirewallException -VMHost $esxi -Name 'syslog' | Set-VMHostFirewallException -Enabled $true -Confirm:$false
+```
+
+<img width="1402" height="327" alt="image" src="https://github.com/user-attachments/assets/ac714f86-73f5-463b-a977-ad9e8de8ff22" />
+
+
+
+- Vérification
+
+```powershell
+Get-AdvancedSetting -Entity $esxi -Name 'Syslog.global.logHost' | Select-Object Value
+Get-VMHostFirewallException -VMHost $esxi -Name 'syslog' | Select-Object Name, Enabled
+```
+
+<img width="1287" height="307" alt="image" src="https://github.com/user-attachments/assets/bcd73bc1-40b3-49b5-ae1f-e51ffaa20a76" />
+
+<img width="1426" height="565" alt="image" src="https://github.com/user-attachments/assets/1942c0ef-f2ca-40c1-9643-e856ef87857d" />
+
+
+Liste tous les services de l'hôte avec leur état et leur politique de démarrage, puis désactive le démarrage automatique du shell ESXi (`TSM`). Cette liste est le point de départ d'un audit de la surface d'attaque.
 
 ```powershell
 Get-VMHostService -VMHost $esxi | Select-Object Key, Label, Running, Policy
 Get-VMHostService -VMHost $esxi | Where-Object { $_.Key -eq 'TSM' } | Set-VMHostService -Policy 'off' -Confirm:$false
 ```
 
-Liste tous les services de l'hôte avec leur état et leur politique de démarrage, puis désactive le démarrage automatique du shell ESXi (`TSM`). Cette liste est le point de départ d'un audit de la surface d'attaque.
+<img width="1405" height="650" alt="image" src="https://github.com/user-attachments/assets/661be37d-d5ae-4abb-b602-2ee0b6a83aff" />
+<img width="1397" height="320" alt="image" src="https://github.com/user-attachments/assets/54b697c6-f6cc-4c5d-8fc0-3a68d63762b5" />
+
+
+Affiche uniquement les règles de pare-feu activées, avec leurs ports et leurs protocoles. Chaque règle ouverte doit pouvoir être justifiée.
 
 ```powershell
 Get-VMHostFirewallException -VMHost $esxi | Where-Object { $_.Enabled } | Select-Object Name, IncomingPorts, OutgoingPorts, Protocols, ServiceRunning
 ```
+<img width="1402" height="647" alt="image" src="https://github.com/user-attachments/assets/aa865b1d-e0c5-4224-9b76-412525bdfd49" />
+<img width="1406" height="607" alt="image" src="https://github.com/user-attachments/assets/aec0cd92-8453-40ba-b3d0-f12daf9745d4" />
+<img width="1412" height="652" alt="image" src="https://github.com/user-attachments/assets/6418262a-45f3-406b-8364-b4b0f69736c8" />
+<img width="1415" height="651" alt="image" src="https://github.com/user-attachments/assets/65e9e607-afb4-4a67-96d1-7b82ff03797c" />
+<img width="1417" height="380" alt="image" src="https://github.com/user-attachments/assets/2f00e285-ad66-4b76-a60e-40f397b8d53d" />
 
-Affiche uniquement les règles de pare-feu activées, avec leurs ports et leurs protocoles. Chaque règle ouverte doit pouvoir être justifiée.
 
 ---
 
@@ -2023,7 +2365,7 @@ Affiche uniquement les règles de pare-feu activées, avec leurs ports et leurs 
 
 À la fin de cette phase, l'étudiant sait appliquer une méthode de supervision, lire les compteurs de performance essentiels, distinguer tâches, événements et journaux, localiser les fichiers de journaux de l'hôte et produire un inventaire exploitable.
 
-### Cours : la méthode USE
+### La méthode USE
 
 Pour chaque ressource (CPU, mémoire, disque, réseau), on examine trois aspects :
 
@@ -2035,7 +2377,7 @@ Pour chaque ressource (CPU, mémoire, disque, réseau), on examine trois aspects
 
 Une utilisation élevée sans saturation n'est pas forcément un problème. Une saturation, même avec une utilisation modérée, l'est presque toujours.
 
-### Cours : les compteurs essentiels
+### Les compteurs essentiels
 
 Une métrique se nomme `groupe.compteur.agrégation`. Les groupes principaux sont `cpu`, `mem`, `disk`, `net`, `sys` et `datastore`.
 
@@ -2051,11 +2393,11 @@ Une métrique se nomme `groupe.compteur.agrégation`. Les groupes principaux son
 
 Sur un hôte autonome, seules les statistiques en temps réel sont disponibles : un échantillon toutes les 20 secondes, conservé environ une heure. Les cumuls historiques (jour, semaine, mois) nécessitent vCenter. Il faut donc exporter régulièrement ses mesures pour garder une trace.
 
-### Cours : esxtop
+### Esxtop
 
 `esxtop` est l'outil interactif de performance de l'hôte (SSH ou console). Écrans courants : `c` (CPU), `m` (mémoire), `d` (disque), `n` (réseau). Le mode `esxtop -b -n 10 > fichier.csv` produit un enregistrement exploitable après coup. Il donne des indicateurs plus fins que l'API, mais PowerCLI suffit pour la plupart des besoins de suivi.
 
-### Cours : tâches, événements, alarmes
+### Tâches, événements, alarmes
 
 | Notion | Définition |
 | :--- | :--- |
@@ -2065,7 +2407,7 @@ Sur un hôte autonome, seules les statistiques en temps réel sont disponibles :
 
 Les événements servent d'audit : qui a fait quoi, quand. Ils sont consultables avec `Get-VIEvent`.
 
-### Cours : les journaux de l'hôte
+### Les journaux de l'hôte
 
 Ils se trouvent dans `/var/log` et sont accessibles par `Get-Log` sans SSH :
 
@@ -2082,7 +2424,7 @@ Ils se trouvent dans `/var/log` et sont accessibles par `Get-Log` sans SSH :
 
 Ils tournent (rotation) et sont limités en taille : sans export ni syslog, les anciennes lignes sont perdues.
 
-### Cours : lire une anomalie
+### Lire une anomalie
 
 Démarche de diagnostic type :
 
@@ -2092,7 +2434,7 @@ Démarche de diagnostic type :
 4. Corréler avec les compteurs de performance.
 5. Formuler une hypothèse, la tester, noter la cause et la correction.
 
-### Cours : l'inventaire comme document d'exploitation
+### L'inventaire comme document d'exploitation
 
 Un inventaire régulier (VM, ressources, datastores) permet de détecter les VM oubliées, les disques qui grossissent et les écarts de configuration. Exporté en CSV, il se compare facilement d'une date à l'autre. Les propriétés calculées servent à le rendre lisible.
 
@@ -2114,45 +2456,64 @@ Un inventaire régulier (VM, ressources, datastores) permet de détecter les VM 
 4. Quelle cmdlet donne la liste des journaux disponibles ?
    Réponse : `Get-LogType`.
 
-### Commandes
+### Configuration
+
+Récupère les 10 derniers échantillons en temps réel d'utilisation du CPU et de la mémoire de l'hôte, exprimés en pourcentage.
 
 ```powershell
 Get-Stat -Entity $vmhost -Stat 'cpu.usage.average','mem.usage.average' -Realtime -MaxSamples 10 | Select-Object Timestamp, MetricId, Value, Unit
 ```
 
-Récupère les 10 derniers échantillons en temps réel d'utilisation du CPU et de la mémoire de l'hôte, exprimés en pourcentage.
+<img width="1391" height="660" alt="image" src="https://github.com/user-attachments/assets/cbebf767-c597-41f0-8a00-84150da7c303" />
+
+Même principe pour une VM. Elle doit être allumée pour fournir des échantillons.
+
 
 ```powershell
 Get-Stat -Entity (Get-VM -Name 'VM-Network-Test') -Stat 'cpu.usage.average' -Realtime -MaxSamples 5 | Select-Object Timestamp, Value, Unit
 ```
 
-Même principe pour une VM. Elle doit être allumée pour fournir des échantillons.
+<img width="1402" height="402" alt="image" src="https://github.com/user-attachments/assets/fb12e08d-721e-4d28-842f-5926577adadf" />
+
+
+Lit les indicateurs agrégés de l'hôte. `Uptime` est exprimé en secondes.
 
 ```powershell
 $stats = (Get-View -Id $vmhost.Id).Summary.QuickStats
 $stats | Select-Object OverallCpuUsage, OverallMemoryUsage, Uptime
 ```
 
-Lit les indicateurs agrégés de l'hôte. `Uptime` est exprimé en secondes.
+<img width="1130" height="312" alt="image" src="https://github.com/user-attachments/assets/f2e1070e-1cf1-4883-b737-f65bcb019ec1" />
+
+Affiche les 20 derniers événements de l'hôte avec leur date, l'utilisateur concerné et le message. Utile pour reconstituer les actions réalisées pendant le lab.
+
 
 ```powershell
 Get-VIEvent -Entity $vmhost -MaxSamples 20 | Select-Object CreatedTime, UserName, FullFormattedMessage
 ```
 
-Affiche les 20 derniers événements de l'hôte avec leur date, l'utilisateur concerné et le message. Utile pour reconstituer les actions réalisées pendant le lab.
+<img width="1402" height="657" alt="image" src="https://github.com/user-attachments/assets/cb17a73d-ea97-41b7-aff4-0fd799e08062" />
+
+
+Liste les journaux disponibles sur l'hôte puis affiche les 20 dernières lignes du journal `vmkernel`. **Point d'attention** : si `Get-Log` ne renvoie rien, la clé est invalide. Utiliser les clés affichées par `Get-LogType`.
 
 ```powershell
 Get-LogType -VMHost $esxi | Select-Object Key, Info
 (Get-Log -VMHost $esxi -Key 'vmkernel' -NumLines 20).Entries
 ```
 
-Liste les journaux disponibles sur l'hôte puis affiche les 20 dernières lignes du journal `vmkernel`. **Point d'attention** : si `Get-Log` ne renvoie rien, la clé est invalide. Utiliser les clés affichées par `Get-LogType`.
+<img width="1412" height="651" alt="image" src="https://github.com/user-attachments/assets/bdbab1d0-9cf9-44f6-ab43-77b4f7d97fe0" />
+
+Exporte un inventaire des VM avec leur état, leur dimensionnement, leur espace disque et leur datastore. Le résultat est un document d'exploitation réutilisable.
+
 
 ```powershell
 Get-VM | Select-Object Name, PowerState, NumCpu, MemoryGB, ProvisionedSpaceGB, UsedSpaceGB, @{N='Datastore';E={(Get-Datastore -RelatedObject $_).Name -join ','}} | Export-Csv -Path "/home/holuser/Inventaire-VM.csv" -NoTypeInformation
 ```
 
-Exporte un inventaire des VM avec leur état, leur dimensionnement, leur espace disque et leur datastore. Le résultat est un document d'exploitation réutilisable.
+<img width="1406" height="345" alt="image" src="https://github.com/user-attachments/assets/bd3766b0-65a5-4d38-bd9a-4752afd923f1" />
+
+
 
 ---
 
@@ -2162,7 +2523,7 @@ Exporte un inventaire des VM avec leur état, leur dimensionnement, leur espace 
 
 À la fin de cette phase, l'étudiant sait distinguer sauvegarde de configuration et sauvegarde de données, définir RPO et RTO, expliquer le fonctionnement des sauvegardes d'images de VM, appliquer la règle 3-2-1 et exporter une VM au format OVF.
 
-### Cours : que protège-t-on ?
+### Que protège-t-on ?
 
 | Élément | Contenu | Outil |
 | :--- | :--- | :--- |
@@ -2173,22 +2534,22 @@ Exporte un inventaire des VM avec leur état, leur dimensionnement, leur espace 
 
 Une erreur classique est de croire que sauvegarder l'hôte protège les VM, ou l'inverse. Ce sont deux protections indépendantes.
 
-### Cours : RPO et RTO
+### RPO et RTO
 
 - **RPO (Recovery Point Objective)** : perte de données maximale acceptable, exprimée en temps. Un RPO de 24 heures signifie qu'on tolère de perdre une journée de données, donc une sauvegarde au moins quotidienne.
 - **RTO (Recovery Time Objective)** : durée maximale acceptable pour remettre le service en marche.
 
 Ces deux objectifs viennent du besoin métier. Ils déterminent la fréquence des sauvegardes, la technologie et le budget.
 
-### Cours : la règle 3-2-1
+### La règle 3-2-1
 
 Trois copies des données, sur deux types de supports différents, dont une copie hors site. Une version moderne ajoute une copie immuable (non modifiable) ou isolée du réseau, pour résister aux rançongiciels. Une sauvegarde jamais testée en restauration n'est pas une sauvegarde : prévoir des tests de restauration réguliers.
 
-### Cours : la sauvegarde de configuration d'un hôte
+### La sauvegarde de configuration d'un hôte
 
 Le bundle est une archive compressée de l'état de configuration. Elle permet de reconstruire un hôte après réinstallation : on réinstalle la même version et build d'ESXi, puis on restaure le bundle. La restauration exige le mode maintenance et provoque un redémarrage. Les paramètres locaux sensibles y figurent, il faut donc **protéger le fichier** (accès restreint, chiffrement du support).
 
-### Cours : la sauvegarde d'images de VM
+### La sauvegarde d'images de VM
 
 Les logiciels de sauvegarde modernes utilisent l'API VADP (vSphere APIs for Data Protection) :
 
@@ -2199,14 +2560,14 @@ Les logiciels de sauvegarde modernes utilisent l'API VADP (vSphere APIs for Data
 
 Cela repose le plus souvent sur vCenter. Sur un hôte autonome, on recourt à des exports ou à des solutions qui acceptent les hôtes isolés.
 
-### Cours : le format OVF et OVA
+### Le format OVF et OVA
 
 - **OVF** : standard ouvert qui décrit une VM par un descripteur XML (`.ovf`), un manifeste de contrôle d'intégrité (`.mf`) et un ou plusieurs disques (`.vmdk`).
 - **OVA** : même contenu regroupé dans une archive unique.
 
 L'export est indépendant de la plateforme et convient au transfert, à l'archivage ponctuel et au déploiement d'un modèle. Il n'est pas adapté à une sauvegarde quotidienne de nombreuses VM, car il est lent et manuel. L'export d'une VM éteinte garantit la cohérence.
 
-### Cours : conservation et sécurité
+### Conservation et sécurité
 
 - Définir une durée de rétention par type de donnée.
 - Chiffrer les sauvegardes quittant le site.
@@ -2231,14 +2592,20 @@ L'export est indépendant de la plateforme et convient au transfert, à l'archiv
 4. Quels fichiers composent un export OVF ?
    Réponse : un descripteur `.ovf`, un manifeste `.mf` et les disques `.vmdk`.
 
-### Commandes
+### Configuration
+
+Crée le dossier de destination puis télécharge le bundle de configuration de l'hôte. **Point d'attention** : le dossier doit exister avant l'appel, sinon la commande échoue.
 
 ```powershell
 New-Item -Path "/home/holuser/backup" -ItemType Directory -Force | Out-Null
 Get-VMHostFirmware -VMHost $esxi -BackupConfiguration -DestinationPath "/home/holuser/backup"
 ```
 
-Crée le dossier de destination puis télécharge le bundle de configuration de l'hôte. **Point d'attention** : le dossier doit exister avant l'appel, sinon la commande échoue.
+<img width="1390" height="477" alt="image" src="https://github.com/user-attachments/assets/993888b0-abe6-47aa-b942-52111bb3b598" />
+
+
+Éteint la VM puis l'exporte au format OVF dans le dossier indiqué. L'export d'une VM éteinte garantit un état cohérent.
+
 
 ```powershell
 Stop-VM -VM 'VM-Network-Test' -Confirm:$false
@@ -2246,16 +2613,44 @@ New-Item -Path "/home/holuser/export" -ItemType Directory -Force | Out-Null
 Export-VApp -VM (Get-VM -Name 'VM-Network-Test') -Destination "/home/holuser/export" -Format Ovf
 ```
 
-Éteint la VM puis l'exporte au format OVF dans le dossier indiqué. L'export d'une VM éteinte garantit un état cohérent.
-
-```powershell
-# Référence uniquement, à ne pas exécuter dans le lab
-Set-VMHost -VMHost $esxi -State Maintenance -Confirm:$false
-Set-VMHostFirmware -VMHost $esxi -Restore -SourcePath "/home/holuser/backup/configBundle-esx-03a.vcf.sddc.lab.tgz" -HostCredential $esxiCred
-```
+<img width="1392" height="557" alt="image" src="https://github.com/user-attachments/assets/8a6cb94e-918f-4d51-b665-dffdb726d211" />
 
 Illustre la procédure de restauration : mise en maintenance puis restauration du bundle, qui redémarre l'hôte. Le nom exact du fichier `.tgz` dépend de la sauvegarde réalisée. Dans HOL, un redémarrage de l'hôte peut rendre l'environnement inutilisable.
 
+####  Référence uniquement, à ne pas exécuter dans le lab
+
+- Vérifier que l'hôte est bien en mode maintenance (obligatoire pour la restauration)
+
+```powershell
+Set-VMHost -VMHost $esxi -State Maintenance -Confirm:$false
+```
+
+- (Optionnel mais recommandé) Redémarrer l'hôte avant la restauration pour s'assurer que rien ne bloque
+
+```powershell
+Restart-VMHost -VMHost $esxi -Confirm:$false
+```
+
+- Lancer la restauration
+
+**Note** : L'erreur "connexion fermée" qui peut apparaître à la fin est normale (l'hôte redémarre)
+
+```powershell
+Set-VMHostFirmware -VMHost $esxi -Restore -SourcePath "/home/holuser/backup/configBundle-esx-03a.vcf.sddc.lab.tgz" -HostCredential $esxiCred
+```
+
+- Attendre le redémarrage de l'hôte (environ 2-5 minutes), puis se reconnecter
+
+```powershell
+Start-Sleep -Seconds 180
+Connect-VIServer -Server "esx-03a.vcf.sddc.lab" -Credential $esxiCred
+```
+
+- Vérifier que l'hôte est bien sorti du mode maintenance et que la configuration est appliquée
+
+```powershell
+Get-VMHost | Select-Object Name, ConnectionState, Version, Build
+```
 ---
 
 ## 21. Phase 18 : Automatisation et rapport de santé
@@ -2264,11 +2659,11 @@ Illustre la procédure de restauration : mise en maintenance puis restauration d
 
 À la fin de cette phase, l'étudiant sait écrire une fonction PowerShell robuste, gérer correctement les erreurs, journaliser l'exécution, éviter la présence de secrets en clair, optimiser les requêtes vers l'API et produire un rapport automatisable.
 
-### Cours : pourquoi automatiser
+### Pourquoi automatiser
 
 L'automatisation apporte la reproductibilité (même résultat à chaque exécution), la rapidité, la traçabilité et la réduction des erreurs manuelles. Elle impose en retour de la rigueur : un script mal écrit commet la même erreur sur cent hôtes en quelques secondes. D'où les règles qui suivent.
 
-### Cours : écrire une fonction propre
+### Ecrire une fonction propre
 
 | Principe | Application |
 | :--- | :--- |
@@ -2282,7 +2677,7 @@ L'automatisation apporte la reproductibilité (même résultat à chaque exécut
 
 Pour les fonctions qui modifient, ajouter `[CmdletBinding(SupportsShouldProcess)]` et appeler `$PSCmdlet.ShouldProcess()` permet de bénéficier de `-WhatIf` et `-Confirm`, comme les cmdlets natives.
 
-### Cours : gérer les erreurs
+### Gérer les erreurs
 
 PowerShell distingue les erreurs **terminantes**, qui interrompent et sont interceptées par `catch`, et les erreurs **non terminantes**, qui s'affichent puis le script continue. Un `try` ne capture que les erreurs terminantes. Pour qu'une cmdlet déclenche le `catch`, il faut lui ajouter `-ErrorAction Stop` ou fixer `$ErrorActionPreference = 'Stop'` dans le bloc.
 
@@ -2301,27 +2696,27 @@ finally {
 
 `finally` s'exécute dans tous les cas : c'est l'endroit pour nettoyer (fermer une session, supprimer un fichier temporaire).
 
-### Cours : journaliser
+### Journaliser
 
 - `Start-Transcript` enregistre tout ce qui s'affiche dans la session.
 - `Write-Verbose` fournit des messages détaillés activés à la demande avec `-Verbose`.
 - Pour un suivi durable, écrire dans un fichier horodaté ou envoyer à un syslog.
 
-### Cours : les secrets
+### Les secrets
 
 Ne jamais laisser un mot de passe en clair dans un script versionné. Options, par ordre croissant de robustesse : saisie interactive avec `Get-Credential`, variable d'environnement, module `Microsoft.PowerShell.SecretManagement` avec un coffre (KeePass, HashiCorp Vault, Azure Key Vault). Le chiffrement de fichiers d'identifiants par `Export-Clixml` repose sur DPAPI et ne fonctionne pas sous Linux.
 
-### Cours : écrire des scripts performants
+### Ecrire des scripts performants
 
 - Filtrer le plus tôt possible : utiliser les paramètres de la cmdlet (`Get-VM -Name`) avant `Where-Object`.
 - Pour de gros inventaires, `Get-View` avec la propriété `-Property` est beaucoup plus rapide que `Get-VM` suivi d'accès à `ExtensionData`, qui multiplie les appels.
 - Éviter les appels en boucle : récupérer une fois, réutiliser la variable.
 
-### Cours : rendre le script idempotent
+### Rendre le script idempotent
 
 Un script idempotent contrôle l'état avant d'agir : il crée un objet seulement s'il n'existe pas, change une valeur seulement si elle diffère. On peut le relancer sans crainte. C'est la propriété la plus importante pour un script de configuration.
 
-### Cours : industrialiser
+### Industrialiser
 
 | Étape | Outil |
 | :--- | :--- |
@@ -2349,13 +2744,20 @@ Un script idempotent contrôle l'état avant d'agir : il crée un objet seulemen
 4. Qu'est-ce qu'un script idempotent ?
    Réponse : un script qui vérifie l'état avant d'agir et peut être rejoué sans effet indésirable.
 
-### Commandes
+### Configuration
+
+Démarre l'enregistrement de la session dans un fichier. `-Append` ajoute à la suite du contenu existant.
+
 
 ```powershell
 Start-Transcript -Path "/home/holuser/lab-session.log" -Append
 ```
 
-Démarre l'enregistrement de la session dans un fichier. `-Append` ajoute à la suite du contenu existant.
+<img width="1026" height="270" alt="image" src="https://github.com/user-attachments/assets/b87be310-b294-42cd-bf39-a410d06d26a2" />
+
+
+Définit une fonction de contrôle de santé. Elle collecte l'état de l'hôte, le nombre de VM allumées, la consommation CPU et mémoire, les datastores dont l'espace libre est inférieur à 20 pour cent, ainsi que l'état de SSH et de NTP. Le bloc `catch` affiche un message clair en cas de problème. La ligne `$ErrorActionPreference = 'Stop'` rend les erreurs terminantes, ce qui permet au bloc `catch` de les intercepter, comme expliqué dans le cours. Les indicateurs choisis correspondent à ce que surveille un administrateur au quotidien.
+
 
 ```powershell
 function Get-LabHealthCheck {
@@ -2387,22 +2789,28 @@ function Get-LabHealthCheck {
     }
 }
 ```
+<img width="1412" height="650" alt="image" src="https://github.com/user-attachments/assets/4a8d5597-c37c-4bec-82b1-721ba7348bcb" />
 
-Définit une fonction de contrôle de santé. Elle collecte l'état de l'hôte, le nombre de VM allumées, la consommation CPU et mémoire, les datastores dont l'espace libre est inférieur à 20 pour cent, ainsi que l'état de SSH et de NTP. Le bloc `catch` affiche un message clair en cas de problème. La ligne `$ErrorActionPreference = 'Stop'` rend les erreurs terminantes, ce qui permet au bloc `catch` de les intercepter, comme expliqué dans le cours. Les indicateurs choisis correspondent à ce que surveille un administrateur au quotidien.
+
+Exécute la fonction sur l'hôte du lab puis affiche le résultat sous forme de liste lisible.
 
 ```powershell
 $rapport = Get-LabHealthCheck -VMHost $vmhost
 $rapport | Format-List
 ```
 
-Exécute la fonction sur l'hôte du lab puis affiche le résultat sous forme de liste lisible.
+<img width="960" height="391" alt="image" src="https://github.com/user-attachments/assets/6716e3a1-3cdb-46fd-8766-1f8d2eb37e2d" />
+
+
+
+Convertit le rapport en page HTML consultable dans un navigateur puis arrête l'enregistrement de la session. On obtient ainsi deux livrables : le rapport et le journal d'exécution.
 
 ```powershell
 $rapport | ConvertTo-Html -Title 'Rapport de sante ESXi' | Out-File "/home/holuser/Rapport-Sante.html"
 Stop-Transcript
 ```
+<img width="1375" height="167" alt="image" src="https://github.com/user-attachments/assets/6a35f1e2-c7dc-4b2c-8b6b-eaaa98783fba" />
 
-Convertit le rapport en page HTML consultable dans un navigateur puis arrête l'enregistrement de la session. On obtient ainsi deux livrables : le rapport et le journal d'exécution.
 
 ---
 
